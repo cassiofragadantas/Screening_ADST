@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/greta/!svn/ver/876/cowork/screening_tests/codes/Dyn_screening/tags/packageV2/experiments
+END
+generate_problem.py
+K 25
+svn:wc:ra_dav:version-url
+V 109
+/greta/!svn/ver/876/cowork/screening_tests/codes/Dyn_screening/tags/packageV2/experiments/generate_problem.py
+END
+misc.py
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/greta/!svn/ver/877/cowork/screening_tests/codes/Dyn_screening/tags/packageV2/experiments/misc.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/greta/!svn/ver/876/cowork/screening_tests/codes/Dyn_screening/tags/packageV2/experiments/__init__.py
+END
+__main__.py
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/greta/!svn/ver/877/cowork/screening_tests/codes/Dyn_screening/tags/packageV2/experiments/__main__.py
+END
+expe.py
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/greta/!svn/ver/877/cowork/screening_tests/codes/Dyn_screening/tags/packageV2/experiments/expe.py
+END

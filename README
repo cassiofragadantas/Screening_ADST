@@ -1,0 +1,25 @@
+===============================================================================
+THIS CODE IS A MODIFIED VERSION OF THE CODE PROVIDED BY ANTOINE BONNEFOY AT:
+http://pageperso.lif.univ-mrs.fr/~antoine.bonnefoy/?q=node/5
+===============================================================================
+
+This package contain the codes for reproducing the experiment of "Dynamic Screening: accelerating First-order Algorithms for the Lasso and Group-Lasso." A. Bonnefoy et al.
+
+You can very easily reproduce the 3 experiments of the article on synthetic data and 
+corresponding graphics:
+
+1- the screening progression
+2- Normalized Running Times and Flops for the Lasso
+3- Idem for the Group-Lasso 
+
+Default values corresponds almost to those of the article.
+
+To run experiments from your console just:
+$ python -m experiments exp_num 
+
+or for more help
+$ python -m experiments -h
+
+
+For any question feel free to send me an email at:
+ antoine.bonnefoy at lif dot univ-mrs dot fr 
