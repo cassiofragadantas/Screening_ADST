@@ -241,7 +241,7 @@ def flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC=1,switch_it=0):
                     #6*K + 5*N + 5*nb_gr) * nbit
                     
         else:
-            flops = ( N*K*(RC + 1 -
+            flops = ( N*K*RC*(1 + 1 - 
                         np.asarray(zeros[0:switch_it]).mean()/K) + \
                         7*(1-np.asarray(screenrate[0:switch_it]).mean()) + 5*N + 5*nb_gr)* switch_it + \
                     ( N*K*(2 - np.asarray(screenrate[switch_it:]).mean() -
@@ -265,15 +265,17 @@ def flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC=1,switch_it=0):
 
  
 def switching_criterion(N, K, RC=1, Rate=0, Rate_old=0, Rate_est=0):
+    # RC criterion
     crit_RC = (1-Rate_est < RC*float(N)/(N-1))  # complexity gain of approximate dicitonary doesn't pay off
 #    crit_RC = (1-Rate < RC*float(N)/(N-1))  # complexity gain of approximate dicitonary doesn't pay off
-    if Rate_est == 0:
-        crit_Rate = (Rate == Rate_old) and (Rate != 0) # Screening has saturated
-    else:
-        crit_Rate = False
+    
+    # Screening saturation criterion
+    crit_Rate = False
+#        crit_Rate = (Rate == Rate_old) and (Rate != 0) # Screening has saturated  
+    
     return (crit_RC or crit_Rate)
 
-def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None, stop = dict(),
+def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None, stop = dict(), switching = '',
                L='backtracking',scr_type="Dome",EmbedTest='dynamic',mon=False, 
                algo_type ='FISTA', warm_start = None, verbose=0):
     """
@@ -377,15 +379,24 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
     if L == None:
         print "computation of the square norm of D... might be long"
         L = LA.norm(problem.D.data,ord=2)**2 
+
+    # Convergence switching criterion
+    if switching == 'screening_only': # No convergence criterion for switching
+        if 'max_iter' in stop.keys():
+            stop_approx = {'max_iter':stop["max_iter"]}
+        else:
+            stop_approx = dict('max_iter',1000)
+    else: # DEFAULT: heuristic convergence criterion
+        stop_approx = stop.copy()
+        stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(float(normE)**2)
+
     
     startTime = time.clock()  
     
     # initialize the variables 
     N,K = problem.D.shape
-    stop_approx = stop.copy()
-    #stop_approx["rel_tol"] = 1e-8
-    stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(float(normE)**2)
     Algo_approx.initialization( L=L, warm_start = warm_start, stop = stop_approx)
+         
 
     Screen = ScreenTestApprox(K,scr_type + "_approx") #"ST1_approx")
     
@@ -402,7 +413,7 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
         screenmon = np.array(Screen.screen[np.newaxis].T)
         
     ## Enter the Loop of approximate problem (before switching)
-    while not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit: #TODO uncomment
+    while not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit:
         #####    One Iteration step    #############
         Algo_approx.Iterate(Screen)
         
@@ -449,7 +460,8 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
         if mon: # monitoring data
             screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
             xmon = np.append(xmon,Algo_approx.x,axis=1)
-    
+
+  
     ## Enter the Loop of original problem
     switch_it = Algo_approx.itCount
     Screen.TestType = scr_type #'ST1'
@@ -457,9 +469,10 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
     Screen.normE = 0
     
     Algo_approx.stopCrit = ''
-    Algo_approx.D = problem.D_bis
+    #Algo_approx.D = problem.D_bis # artigo
     Algo_approx.stopParams["rel_tol"] = stop["rel_tol"]
     problem.D, problem.D_bis = problem.D_bis, problem.D
+    #Algo_approx.D = problem.D
     
     # Avoiding complexity peak at switching point
     # screen_est is used on the first iteration instead of screen

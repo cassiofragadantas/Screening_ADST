@@ -31,9 +31,12 @@ def mergeopt(opt, default, keywords):
 def make_file_name(opt):
     for key in opt.keys():
         exec(key+' = '+repr(opt[key]))  
-    name = opt['algo_type']+'_'+opt['dict_type']+'_N'+str(opt['N'])+"_K"+\
+    name = opt['algo_type']+'_'+opt['dict_type']+'-dict_'+opt['data_type']+'-data_N'+str(opt['N'])+"_K"+\
             str(opt['K'])+'_'+str(opt['scr_type'])
 
+    if opt['dict_type'] == 'sukro':
+        name += "_sep-terms"+str(opt['dict_params']['n_kron'])
+       
     if opt['sparse'] != None:
         name += "_sp"+str(opt['sparse'])
     
@@ -49,6 +52,9 @@ def make_file_name(opt):
         
         if opt['spacing'] != 'linear':
                     name+= '_spacing'+str(opt['spacing'])
+                    
+    if 'nbRuns' in opt.keys():
+        name += "_nbRuns"+str(opt['nbRuns'])
             
     return name
     
@@ -58,7 +64,7 @@ def make_pen_param_list(samp=10):
         
         
 
-def type2name(dict_type):    
+def type2name(dict_type,opt={}):    
     if dict_type =='gnoise':
         return 'Gaussian dictionary' 
     elif dict_type == 'pnoise':
@@ -68,8 +74,9 @@ def type2name(dict_type):
     elif dict_type =='MNIST':
         return 'MNIST Database'         
     elif dict_type =='cancer':
-        return 'Cancer Database with groups'         
-        
+        return 'Cancer Database with groups'
+    elif dict_type =='sukro':
+        return 'SuKro ('+str(opt['dict_params']['n_kron'])+' terms)'
         
 def testopt(opt): 
     """
@@ -78,9 +85,10 @@ def testopt(opt):
     if opt['algo_type'] not in ['ISTA','FISTA','SPARSA','Chambolle_Pock','TWIST']:
         raise NotImplementedError(opt['algo_type']+' Algorithm is not implemented yet')
         exit(0)
-    if opt['dict_type'] not in ['gnoise','pnoise','DCT', 'audio','MNIST','audioSynth','cancer']:
+    if opt['dict_type'] not in ['gnoise','pnoise','sukro','DCT', 'audio','MNIST','audioSynth','cancer']:
         raise ValueError('Not Valid dictionary')
-    
+    if opt['data_type'] not in ['gnoise','pnoise','bernoulli-gaussian']:
+        raise ValueError('Not Valid data type')
         
         
         

@@ -14,7 +14,7 @@ from dynascreen.dictionary import Dict
 
     
     
-def generate(opt, D=None):
+def generate(opt, D=None,y=None):
     '''
     Generate the problem corresponding to the options given in opt
     
@@ -29,7 +29,11 @@ def generate(opt, D=None):
     '''
 
     if not opt['Gr']:
-        D, y = noise(opt['N'],opt['K'], dict_type=opt['dict_type'], D=D)
+        if 'dict_params' not in opt.keys():
+            opt['dict_params']=None
+
+        D, y = noise(opt['N'],opt['K'], dict_type=opt['dict_type'], data_type=opt['data_type'],\
+                     dict_params=opt['dict_params'], D=D,y=y)
         
         prob = Lasso(D, y)
         star,lstar = prob.getStar() 
@@ -39,7 +43,7 @@ def generate(opt, D=None):
 
         Gr= buildGroups(opt['K'],opt['grsize'])
         opt['Gr']=Gr        
-        D, y = noise(opt['N'],opt['K'], dict_type=opt['dict_type'], D=D)
+        D, y = noise(opt['N'],opt['K'], dict_type=opt['dict_type'], data_type=opt['data_type'], D=D,y=y)
         if opt['sparse'] is not None:
             y, coef_GT = sparse_sig(D, s=opt['sparse'], Gr= Gr, SNR=20)
         prob = GroupLasso(D, y, Gr)
@@ -53,7 +57,7 @@ def generate(opt, D=None):
     return prob, opt
 
 
-def noise(N, K, dict_type="gnoise",D=None):
+def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, D=None,y=None):
     '''
     Generate a dictionary and signal where the signal and all atoms follow the
     same distribution gaussians noise or pnoise.
@@ -78,20 +82,48 @@ def noise(N, K, dict_type="gnoise",D=None):
             D = Dict(np.eye(N,1)+0.01*np.tile(np.random.rand(1,K),\
                     (N,1))*np.random.randn(N,K)) 
         elif dict_type=='gnoise':
-            D = Dict(np.random.randn(N,K))   
-             
+            D = Dict(np.random.randn(N,K))
+        elif dict_type=='sukro':
+            D_sukro = np.zeros([N,K])
+            # Separable Factors
+            A = np.random.randn(dict_params['N1'],dict_params['K1'],dict_params['n_kron'])
+            B = np.random.randn(dict_params['N2'],dict_params['K2'],dict_params['n_kron'])
+            for k_rank in range(dict_params['n_kron']):
+                D_sukro = D_sukro + np.kron(A[:,:,k_rank],B[:,:,k_rank])
+                
+            D = Dict(D_sukro,opType="sukro",params=dict(A=A,B=B))
+                             
         D.normalize()
-    if dict_type=='pnoise':
-        y = np.eye(N,1)+0.01*np.tile(np.random.rand(1,1),\
-                (N,1))*np.random.randn(N,1)
-    elif dict_type=='gnoise':
-#        y = np.random.randn(N,1)
-        #TODO teste, bernoulli (not really) gaussian
-        nz = int(0.02*K)
-        beta = np.zeros((K,1))
-        idx = K*np.random.rand(1,nz)
-        beta[idx.astype(int)] = np.random.randn(nz,1)
-        y = D.data.dot(beta)
+    
+    # BEFORE data_type
+#    if dict_type=='pnoise':
+#        y = np.eye(N,1)+0.01*np.tile(np.random.rand(1,1),\
+#                (N,1))*np.random.randn(N,1)
+#    elif dict_type=='gnoise':
+##        y = np.random.randn(N,1)
+#        #TODO teste, bernoulli (not really) gaussian
+#        nz = int(0.02*K)
+#        beta = np.zeros((K,1))
+#        idx = K*np.random.rand(1,nz)
+#        beta[idx.astype(int)] = np.random.randn(nz,1)
+#        y = D.data.dot(beta)
+#    elif dict_type=='sukro':
+#        y = np.random.randn(N,1)        
+    
+    if not y:    
+        if data_type=='pnoise':
+            y = np.eye(N,1)+0.01*np.tile(np.random.rand(1,1),\
+                    (N,1))*np.random.randn(N,1)
+        elif data_type=='gnoise':
+            y = np.random.randn(N,1)
+        elif data_type=="bernoulli-gaussian":
+            #Bernoulli (not really) gaussian active features generanting 'y'
+            p = 0.02
+            nz = int(p*K) # not really bernoulli because the number of active features is deterministic here.
+            beta = np.zeros((K,1))
+            idx = K*np.random.rand(1,nz)
+            beta[idx.astype(int)] = np.random.randn(nz,1)
+            y = D.data.dot(beta)        
         
     
     y /= np.linalg.norm(y)

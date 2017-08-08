@@ -21,7 +21,7 @@ def first(opt =dict(), **keywords):
      
     to modify default option just do first(algo_type = 'FISTA')...
     '''
-    default =  dict(dict_type = 'gnoise', lasso=0.75, N=1000, K=5000, 
+    default =  dict(dict_type = 'gnoise', data_type = 'gnoise', lasso=0.75, N=1000, K=5000, 
                     stop = dict(rel_tol = 1e-8))
     expe = mergeopt(opt, default, keywords)
     expeScrRate(opt=expe)
@@ -34,7 +34,7 @@ def second(opt=dict(), **keywords):
     you can chosse the dictionary to be gaussian noise or pnoise
     '''        
     np.random.seed(0)
-    default = dict(dict_type = 'gnoise', N=1000,K=5000)
+    default = dict(dict_type = 'gnoise',data_type = 'gnoise', N=1000,K=5000)
     expe = mergeopt(opt, default, keywords)
     res = runLambdas(opt=expe)
     traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )
@@ -45,7 +45,7 @@ def third(opt=dict(), **keywords):
     Plot the normalized time and flops for a synthetic Group-Lasso problem 
     versus the penalization parameter \lambda/\lambda_*
     '''             
-    default = dict(dict_type = 'pnoise', N=1000,K=5000, Gr = 1, grsize = 10, sparse= 0.05)
+    default = dict(dict_type = 'pnoise',data_type = 'pnoise', N=1000,K=5000, Gr = 1, grsize = 10, sparse= 0.05)
     expe = mergeopt(default,opt, keywords)
     res = runLambdas(opt=expe)
     traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )

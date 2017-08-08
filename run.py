@@ -15,7 +15,7 @@ import sys
 
 # Coloque nessa lista seus argumentos da commandline, dentro de aspas e 
 # separados por virgula (ao invez de espaços)
-sys.argv += ['4']#['4','-sizes', '20','5']
+sys.argv += ['6']#['4','-sizes', '20','5']
 # seleciona um console python normal e da ctrl-f5 ( ou clica no playpause azul)
 # nao esquece de clicar no stop antes de lançar de novo
 
