@@ -33,10 +33,10 @@ matplotlib.rc('mathtext', fontset='cm')
 # NEW FORMATTING! WITH SCIENTIFIC NOTATION AND TOTAL COMPLEXITY AXIS.
 
 # Load data Figure 1
-filename = './ResSynthData/figures/-1-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+filename = './ResSynthData/figures_GRETSI/-1-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 Data = np.load(filename)
 # Load data Figure 2
-#filename = './ResSynthData/figures/2-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+#filename = './ResSynthData/figures_GRETSI/2-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 #Data = np.load(filename)
 
 #plt.figure()
@@ -88,7 +88,7 @@ f.savefig('./ResSynthData/-1-Simu_screenRate_'+make_file_name(opt)+\
 # Intermediate lambda
 
 # Load data
-filename = './ResSynthData/figures/0-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+filename = './ResSynthData/figures_GRETSI/0-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 Data = np.load(filename)
 
 #plt.figure()
@@ -128,26 +128,7 @@ axScreen.set_xlabel("Iteration t")
 
 
 #axFlops_it.plot(np.arange(length),flops_ns,'-b')
-axFlops_it.plot(np.arange(length),fimport numpy as np
-import matplotlib
-import os
-from matplotlib import pyplot as plt 
-
-import experiments
-from experiments.expe_approx import flop_calc_it
-from experiments.misc import make_file_name, type2name, make_pen_param_list
-
-#from .misc import mergeopt, make_file_name, type2name
-#from .misc import testopt, default_expe, make_pen_param_list
-
-# Plot properties
-matplotlib.rc('axes', labelsize = 24)
-matplotlib.rc('xtick', labelsize = 20)
-matplotlib.rc('ytick', labelsize = 20)
-matplotlib.rc('axes', titlesize = 24)
-matplotlib.rc('lines', linewidth = 3)
-
-matplotlib.rc('mathtext', fontset='cm')lops_d, '-k', linewidth = 6,\
+axFlops_it.plot(np.arange(length),flops_d, '-k', linewidth = 6,\
                 label = 'D'+opt['scr_type']) #markevery=[length-1])
 axFlops_it.plot(np.arange(length_approx),flops_d1, '-mx', markevery=markers_on1,\
                 label = 'A-D'+opt['scr_type']+r'$: \| \mathbf{e}_j \|\!=\!10^{-1}$')
@@ -174,14 +155,16 @@ f.savefig('./ResSynthData/0-Simu_screenRate_'+make_file_name(opt)+\
 # NEW FORMATTING! WITH SCIENTIFIC NOTATION AND TOTAL COMPLEXITY AXIS.
 
 # Load data Figure 1
-#filename = './ResSynthData/figures/1-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+#filename = './ResSynthData/figures_GRETSI/1-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 # Load data Figure 2
-#filename = './ResSynthData/figures/2-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+#filename = './ResSynthData/figures_GRETSI/2-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 
-# Load data Figure 1 - beta bernoulli p=0.02
-filename = './ResSynthData/figures/1-beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
-# Load data Figure 2 - beta bernoulli p=0.02
-#filename = './ResSynthData/figures/2-beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
+# Load data Figure 1 - beta bernoulli p=0.02 - Screen_est: OFF
+filename = './ResSynthData/figures_GRETSI/1-beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
+# Load data Figure 2 - beta bernoulli p=0.02 - Screen_est: ON
+#filename = './ResSynthData/figures_GRETSI/2-beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
+# Load data Figure SLIDES - beta bernoulli p=0.02 - No Switching
+#filename = './ResSynthData/figures_GRETSI/no_switching/beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
 
 Data = np.load(filename)
 
@@ -264,7 +247,7 @@ f.savefig('./ResSynthData/1-Simu_screenRate_'+make_file_name(opt)+\
 # Intermediate lambda
 
 # Load data
-filename = './ResSynthData/figures/2-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+filename = './ResSynthData/figures_GRETSI/2-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 Data = np.load(filename)
 
 f , (axScreen, axFlops_it) = \
@@ -330,7 +313,7 @@ f.savefig('./ResSynthData/2-Simu_screenRate_'+make_file_name(opt)+\
 # Intermediate lambda
     
 # Load data
-filename = './ResSynthData/figures/3-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
+filename = './ResSynthData/figures_GRETSI/3-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.75.npz'
 Data = np.load(filename)
 
 f , (axScreen, axFlops_it) = \
@@ -394,7 +377,7 @@ f.savefig('./ResSynthData/3-Simu_screenRate_'+make_file_name(opt)+\
 # High lambda
 
 # Load data
-filename = './ResSynthData/figures/4-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.85.npz'
+filename = './ResSynthData/figures_GRETSI/4-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.85.npz'
 Data = np.load(filename)
 
 f , (axScreen, axFlops_it) = \
@@ -457,7 +440,7 @@ f.savefig('./ResSynthData/4-Simu_screenRate_'+make_file_name(opt)+\
 # Low lambda
 
 # Load data
-filename = './ResSynthData/figures/5-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.4.npz'
+filename = './ResSynthData/figures_GRETSI/5-ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.4.npz'
 Data = np.load(filename)
 
 f , (axScreen, axFlops_it) = \
