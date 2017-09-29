@@ -92,6 +92,14 @@ def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, D=None,
                 D_sukro = D_sukro + np.kron(A[:,:,k_rank],B[:,:,k_rank])
                 
             D = Dict(D_sukro,opType="sukro",params=dict(A=A,B=B))
+        elif dict_type=='low-rank':
+            D_lowrank = np.zeros([N,K])
+            # Low-rank Factors
+            L = np.random.randn(N,dict_params['n_rank'])
+            R = np.random.randn(dict_params['n_rank'],K)
+            D_lowrank = L.dot(R)
+                
+            D = Dict(D_lowrank,opType="low-rank",params=dict(L=L,R=R))
                              
         D.normalize()
     

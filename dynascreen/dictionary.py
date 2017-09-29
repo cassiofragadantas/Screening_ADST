@@ -30,15 +30,16 @@ class Dict:
         self.opType=opType
         
         if opType=="matrix":
-            self.data=data
+            #self.data = data #This line makes the dictionary C-contiguous
             self.shape = self.data.shape
             if not self.normalized:
                 self.normalize()
         # Initializing sukro dictionary
         elif opType=="sukro":
-            self.data=data
+            #self.data = data #This line makes the dictionary C-contiguous
             self.shape = self.data.shape
             # Submatrices - provided via input 'params'
+            #TODO assert that A and B are provided in 'params'
             self.A = params['A']
             self.B = params['B']
             # Submatrices sizes
@@ -49,6 +50,17 @@ class Dict:
             self.nkron = self.A.shape[2]
             if not self.normalized:
                 self.normalize()
+        elif opType=="low-rank":
+            self.shape = self.data.shape            
+            if not self.normalized:
+                self.normalize()            
+            # L and R matrices(such that D = L*R) provided via input 'params'
+            #TODO test if L and R are provided. If not, do the SVD.
+            self.L = params['L']
+            self.R = params['R']/ self.normcoef[None,:] # Normalize R
+            # Submatrices sizes
+            self.nrank = self.L.shape[1]
+
 
     def Apply(self,vector):
         if self.opType=="matrix":
@@ -63,6 +75,8 @@ class Dict:
             for r in range(self.nkron):
                 y2 = y2 + self.B[:,:,r].dot(X.dot(self.A[:,:,r].T))
             return np.reshape(y2,[self.N2*self.N1,1], order='F')
+        elif self.opType=="low-rank":
+            return self.L.dot(self.R.dot(vector))
                 
     def ApplyScreen(self,vector,screen):
         """
@@ -71,6 +85,7 @@ class Dict:
         if self.opType=="matrix":
             if self.data.__class__.__name__ == 'ndarray':
                 return fprod.BlasCalcDx(self.data,vector,screen)
+                #return fprod.BlasCalcDty(self.data,vector,screen) #This is faster if C-contiguous
             elif 'matrix' in self.data.__class__.__name__:
                 return self.Apply(vector)
         elif self.opType=="sukro": # Screening is not used
@@ -79,6 +94,8 @@ class Dict:
             for r in range(self.nkron):
                 y2 = y2 + self.B[:,:,r].dot(X.dot(self.A[:,:,r].T))
             return np.reshape(y2,[self.N2*self.N1,1], order='F')
+        elif self.opType=="low-rank": # Screening is not used
+            return self.L.dot(self.R.dot(vector))
     
     def ApplyTranspose(self,vector):
         if self.opType=="matrix":
@@ -95,6 +112,8 @@ class Dict:
             for r in range(self.nkron):
                 y2 = y2 + self.B[:,:,r].T.dot(X.dot(self.A[:,:,r]))
             return np.reshape(y2,[self.K2*self.K1,1], order='F')/self.normcoef[:,None]
+        elif self.opType=="low-rank": # Screening is not used
+            return self.R.T.dot(self.L.T.dot(vector))
             
     def ApplyTransposeScreen(self,vector,screen):
         """
@@ -103,6 +122,7 @@ class Dict:
         if self.opType=="matrix":            
             if self.data.__class__.__name__ == 'ndarray':
                 return fprod.BlasCalcDty(self.data.T,vector,screen)
+                #return fprod.BlasCalcDx(self.data.T,vector,screen) #This is faster if C-contiguous
             elif 'matrix' in self.data.__class__.__name__:
                 return self.ApplyTranspose(vector)
         elif self.opType=="sukro": # Screening is not used
@@ -111,15 +131,17 @@ class Dict:
             for r in range(self.nkron):
                 y2 = y2 + self.B[:,:,r].T.dot(X.dot(self.A[:,:,r]))
             return np.reshape(y2,[self.K2*self.K1,1], order='F')/self.normcoef[:,None]
-
-
+        elif self.opType=="low-rank": # Screening is not used
+            return self.R.T.dot(self.L.T.dot(vector))
+            
+    ######################################################
             
     def normalize(self,dim = 0):
         """
         normalize the dictionnary in row (dim=1) or in column (dim=0)
         """
         
-        if (self.opType == "matrix" or self.opType == "sukro") and self.normcoef == []:
+        if (self.opType == "matrix" or self.opType == "sukro" or self.opType == 'low-rank') and self.normcoef == []:
             if self.data.dtype!=np.float and self.data.dtype!=np.complex:
                 self.data = self.data.astype(np.float,copy=False)
             (row,col) = self.data.shape

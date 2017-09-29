@@ -771,3 +771,152 @@ f.suptitle(type2name(opt['dict_type']) + ' + ' + opt['algo_type'],fontsize=26)
 #f.savefig('./ResSynthData/'+make_file_name(opt)+'_Simu_relNoScreen.eps',bbox_inches = 'tight', rasterized=True, dpi=300 )
 
 f.savefig('./ResSynthData/'+make_file_name(opt)+'_Simu_relNoScreen.pdf',bbox_inches = 'tight',bbox_pad = 2)
+
+
+
+#######################################
+# FIGURES SLIDES
+#######################################
+
+############# FIGURE 1 ################
+# Load data Figure 1 SLIDES - beta bernoulli p=0.02 - No Switching
+filename = './ResSynthData/figures_GRETSI/no_switching/beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
+
+Data = np.load(filename)
+
+#plt.figure()    
+f , axScreen = \
+    plt.subplots(1,1,figsize=1.18*plt.figaspect(0.6)) # 1.2*plt.figaspect(0.65)
+
+axFlops_tot = axFlops_it.twinx()
+opt = Data['opt'][()]
+K = opt['K']
+N = opt['N']
+length = Data['nbIter']+1
+#length_approx = Data['nbIter_approx']+1
+length_approx2 = Data['nbIter_approx2']+1
+#length_approx3 = Data['nbIter_approx3']+1
+#markers_on1 = [Data['switch_it'] -1] #, length_approx-1]
+markers_on2 = [Data['switch_it2']-1] #, length_approx2-1]
+#markers_on3 = [Data['switch_it3']-1] #, length_approx3-1]
+markersize = 12
+
+flops_d = flop_calc_it("dynamic",K,N,Data['scrRate'], Data['zeros'],[])
+#flops_d1 = flop_calc_it("dynamic",K,N,Data['scrRate_approx'], Data['zeros_approx'],[],Data['RC'],Data['switch_it'])
+flops_d2 = flop_calc_it("dynamic",K,N,Data['scrRate_approx2'], Data['zeros_approx2'],[],Data['RC'],Data['switch_it2'])
+#flops_d3 = flop_calc_it("dynamic",K,N,Data['scrRate_approx3'], Data['zeros_approx3'],[],Data['RC'],Data['switch_it3'])
+       
+axScreen.plot(np.arange(length),(1 - Data['scrRate'])*K, '-k', linewidth = 6,\
+                label = 'D'+opt['scr_type']) #, 'x', markevery=[length-1]
+#axScreen.plot(np.arange(length_approx),(1 - Data['scrRate_approx'])*K, '-m', markevery=markers_on1,markersize = markersize,\
+#                label = 'A-D'+opt['scr_type']+r'$: \sigma\!=\!10^{-1}$') # Marker on the swithing point 
+axScreen.plot(np.arange(length_approx2),(1 - Data['scrRate_approx2'])*K, '-g', markevery=markers_on2,markersize = markersize,\
+                label = 'A-D'+opt['scr_type']+r'$: \sigma\!=\!10^{-2}$') 
+#axScreen.plot(np.arange(length_approx3),(1 - Data['scrRate_approx3'])*K, '-r', markevery=markers_on3,markersize = markersize,\
+#                label = 'A-D'+opt['scr_type']+r'$: \sigma\!=\!10^{-3}$')
+
+xmax = 50
+axScreen.axis([0,xmax, 0, K*1.1])
+#axScreen.grid(True) 
+axScreen.set_ylabel("Number of active atoms")
+axScreen.set_xlabel("Iteration t")
+axScreen.legend(fontsize=18,loc='center right',frameon=False)
+axScreen.ticklabel_format(style='sci', axis='y', scilimits=(0,0)) #ScientifiC Notation axis 'y'
+
+f.savefig('./ResSynthData/1-SLIDE-Simu_screenRate_'+make_file_name(opt)+\
+    '_lasso'+str(opt['lasso'])+'approx.eps',bbox_inches = 'tight',bbox_pad = 2 )
+    
+f.savefig('./ResSynthData/1-SLIDE-Simu_screenRate_'+make_file_name(opt)+\
+    '_lasso'+str(opt['lasso'])+'approx.pdf',bbox_inches = 'tight',bbox_pad = 2 )
+
+
+############# FIGURE 2 ################
+
+# Load data Figure 2 SLIDES - beta bernoulli p=0.02 - Switching ON - Screen_est: ON
+filename = './ResSynthData/figures_GRETSI/2-beta02_ISTA_gnoise_N100_K500_ST1_regpath10_lambda_0.6.npz'
+
+Data = np.load(filename)
+
+#plt.figure()
+#f , (axScreen, axFlops_it) = \
+#    plt.subplots(2,1,sharex=False,figsize=2*plt.figaspect(1.3))
+f , axScreen = \
+    plt.subplots(1,1,figsize=1.18*plt.figaspect(0.6)) # 1.2*plt.figaspect(0.65)
+
+opt = Data['opt'][()]
+opt['data_type']= 'bernoulli-gaussian'#TODO DELETE AFTER ADDING data_type to npz files
+K = opt['K']
+N = opt['N']
+length = Data['nbIter']+1
+#length_approx = Data['nbIter_approx']+1
+length_approx2 = Data['nbIter_approx2']+1
+#length_approx3 = Data['nbIter_approx3']+1
+#markers_on1 = [Data['switch_it'] -1] #, length_approx-1]
+markers_on2 = [Data['switch_it2']-1] #, length_approx2-1]
+#markers_on3 = [Data['switch_it3']-1] #, length_approx3-1]
+markersize = 12
+
+flops_d = flop_calc_it("dynamic",K,N,Data['scrRate'], Data['zeros'],[])
+#flops_d1 = flop_calc_it("dynamic",K,N,Data['scrRate_approx'], Data['zeros_approx'],[],Data['RC'],Data['switch_it'])
+flops_d2 = flop_calc_it("dynamic",K,N,Data['scrRate_approx2'], Data['zeros_approx2'],[],Data['RC'],Data['switch_it2'])
+#flops_d3 = flop_calc_it("dynamic",K,N,Data['scrRate_approx3'], Data['zeros_approx3'],[],Data['RC'],Data['switch_it3'])
+       
+axScreen.plot(np.arange(length),(1 - Data['scrRate'])*K, '-k', linewidth = 6,\
+                label = 'D'+opt['scr_type']) #, 'x', markevery=[length-1]
+#axScreen.plot(np.arange(length_approx),(1 - Data['scrRate_approx'])*K, '-mx', markevery=markers_on1,markersize = markersize,\
+#                label = 'A-D'+opt['scr_type']+r'$: \sigma\!=\!10^{-1}$') # Marker on the swithing point 
+axScreen.plot(np.arange(length_approx2),(1 - Data['scrRate_approx2'])*K, '-gx', markevery=markers_on2,markersize = markersize,\
+                label = 'A-D'+opt['scr_type']+r'$: \sigma\!=\!10^{-2}$') 
+#axScreen.plot(np.arange(length_approx3),(1 - Data['scrRate_approx3'])*K, '-rx', markevery=markers_on3,markersize = markersize,\
+#                label = 'A-D'+opt['scr_type']+r'$: \sigma\!=\!10^{-3}$')
+
+xmax = 50
+axScreen.axis([0,xmax, 0, K*1.1])
+#axScreen.grid(True) 
+axScreen.set_ylabel("Number of active atoms")
+axScreen.set_xlabel("Iteration t")
+axScreen.legend(fontsize=18,loc='center right',frameon=False)
+axScreen.ticklabel_format(style='sci', axis='y', scilimits=(0,0)) #ScientifiC Notation axis 'y'
+
+f.savefig('./ResSynthData/2-SLIDE-Simu_screenRate_'+make_file_name(opt)+\
+    '_lasso'+str(opt['lasso'])+'approx.eps',bbox_inches = 'tight',bbox_pad = 2 )
+    
+f.savefig('./ResSynthData/2-SLIDE-Simu_screenRate_'+make_file_name(opt)+\
+    '_lasso'+str(opt['lasso'])+'approx.pdf',bbox_inches = 'tight',bbox_pad = 2 )
+
+# FIG 3
+f , axFlops_it = \
+    plt.subplots(1,1,figsize=1.18*plt.figaspect(0.6)) # 1.2*plt.figaspect(0.65)
+axFlops_tot = axFlops_it.twinx()
+
+axFlops_it.plot(np.arange(length),flops_d, '-k', linewidth = 6,\
+                label = 'D'+opt['scr_type']) #markevery=[length-1])
+#axFlops_it.plot(np.arange(length_approx),flops_d1, '-mx', markevery=markers_on1,markersize = markersize,\
+#                label = 'A-D'+opt['scr_type']+r'$: \| \mathbf{e}_j \|\!=\!10^{-1}$')
+axFlops_it.plot(np.arange(length_approx2),flops_d2, '-gx', markevery=markers_on2,markersize = markersize,\
+                label = 'A-D'+opt['scr_type']+r'$: \| \mathbf{e}_j \|\!=\!10^{-2}$') 
+#axFlops_it.plot(np.arange(length_approx3),flops_d3, '-rx', markevery=markers_on3,markersize = markersize,\
+#                label = 'A-D'+opt['scr_type']+r'$: \| \mathbf{e}_j \|\!=\!10^{-3}$')
+
+axFlops_it.set_ylim((0,1.1*max(max(flops_d),max(flops_d1),max(flops_d2),max(flops_d3))))
+xmax = 50
+axFlops_it.set_xlim((0,xmax))
+axFlops_it.set_ylabel("Flops number") #,fontsize = 24)
+axFlops_it.set_xlabel("Iteration t")
+axFlops_it.ticklabel_format(style='sci', axis='y', scilimits=(0,0)) #ScientifiC Notation axis 'y'
+
+axFlops_tot.ticklabel_format(style='sci', axis='y', scilimits=(0,0)) #ScientifiC Notation axis 'y'
+axFlops_tot.plot(np.arange(length),np.cumsum(flops_d), '--k',linewidth = 0.5,dashes=(3, 5))
+##axFlops_tot.plot(np.arange(length_approx),np.cumsum(flops_d1), '--m',linewidth = 0.5,dashes=(3, 5))
+axFlops_tot.plot(np.arange(length_approx2),np.cumsum(flops_d2), '--g',linewidth = 0.5,dashes=(3, 5)) 
+##axFlops_tot.plot(np.arange(length_approx3),np.cumsum(flops_d3), '--r',linewidth = 0.5,dashes=(3, 5))
+flops_tot_max = np.sum(flops_d[:xmax+1])
+axFlops_tot.set_ylim((0,1.1*flops_tot_max))
+##axFlops_tot.set_ylim((0,flops_tot_max)) #used for beta p=0.02
+axFlops_tot.set_ylabel("Cumulative flops") #,fontsize = 24)
+
+f.savefig('./ResSynthData/3-SLIDE-Simu_screenRate_'+make_file_name(opt)+\
+    '_lasso'+str(opt['lasso'])+'approx.eps',bbox_inches = 'tight',bbox_pad = 2 )
+    
+f.savefig('./ResSynthData/3-SLIDE-Simu_screenRate_'+make_file_name(opt)+\
+    '_lasso'+str(opt['lasso'])+'approx.pdf',bbox_inches = 'tight',bbox_pad = 2 )

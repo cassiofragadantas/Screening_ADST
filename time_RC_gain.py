@@ -109,3 +109,48 @@ plt.semilogy(range(1,max_rank+1),time_gain)
 np.savez('time_RC_gain',N=N,K=K,N1=N1,N2=N2,K1=K1,K2=K2,total_it=total_it,\
          mean_time_struct=mean_time_struct,mean_time_dense=mean_time_dense,\
          complexity_dense=complexity_dense,complexity_struct=complexity_struct)
+         
+         
+#############################################################################
+# NP.DOT
+#############################################################################
+# The computational time is indeed linear with respect to the number of columns         
+N = 1024
+K = 4096
+total_it = 5
+K_vec = range(50,4*K,50)
+mean_time_nbcolumns = np.zeros(len(K_vec))
+#mean_time_nbcolumnsF = np.zeros(len(K_vec)) # F ordered matrix 
+mean_time_nbcolumns_compress = np.zeros(len(K_vec))
+
+ # Evaluating the influence of K (nb. of columns)
+for idx, k in enumerate(K_vec):
+    D = np.random.randn(N,k);
+    active = np.random.choice(2, k,p=[0.8, 0.2]) # generate random 0/1 array p = [p(0),p(1)]
+    for k_it in range(0,total_it):
+         x = np.random.randn(k,1)
+
+         # C contiguous
+         tic = time.clock()
+         y = D.dot(x)
+         toc = time.clock()
+         mean_time_nbcolumns[idx] = mean_time_nbcolumns[idx] + (toc-tic)/float(total_it)
+
+         # F contiguous
+         #tic = time.clock()
+         #y = D.dot(x)
+         #toc = time.clock()
+         #mean_time_nbcolumnsF[idx] = mean_time_nbcolumnsF[idx] + (toc-tic)/float(total_it)
+
+
+         D_compress = D.compress(active,1)
+         x_compress = x.compress(active)         
+         tic = time.clock()
+         y = np.dot(D_compress,x_compress)
+         toc = time.clock()
+         mean_time_nbcolumns_compress[idx] = mean_time_nbcolumns_compress[idx] + (toc-tic)/float(total_it)
+
+plt.plot(K_vec,mean_time_nbcolumns)
+#plt.plot(K_vec,mean_time_nbcolumnsF, 'm') # It doesn't change
+plt.plot(K_vec,mean_time_nbcolumns_compress,'r')
+plt.show()

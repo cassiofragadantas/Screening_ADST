@@ -77,7 +77,8 @@ def type2name(dict_type,opt={}):
         return 'Cancer Database with groups'
     elif dict_type =='sukro':
         return 'SuKro ('+str(opt['dict_params']['n_kron'])+' terms)'
-        
+    elif dict_type =='low-rank':
+        return 'Low Rank (rank = '+str(opt['dict_params']['n_rank'])+')'
 def testopt(opt): 
     """
     tests if the algo and the Dictionary are valid 
@@ -85,7 +86,7 @@ def testopt(opt):
     if opt['algo_type'] not in ['ISTA','FISTA','SPARSA','Chambolle_Pock','TWIST']:
         raise NotImplementedError(opt['algo_type']+' Algorithm is not implemented yet')
         exit(0)
-    if opt['dict_type'] not in ['gnoise','pnoise','sukro','DCT', 'audio','MNIST','audioSynth','cancer']:
+    if opt['dict_type'] not in ['gnoise','pnoise','sukro','low-rank','DCT', 'audio','MNIST','audioSynth','cancer']:
         raise ValueError('Not Valid dictionary')
     if opt['data_type'] not in ['gnoise','pnoise','bernoulli-gaussian']:
         raise ValueError('Not Valid data type')

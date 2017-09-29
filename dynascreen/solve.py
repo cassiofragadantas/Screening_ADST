@@ -129,8 +129,9 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
         print "computation of the square norm of D... might be long"
         L = LA.norm(problem.D.data,ord=2)**2 
     
+    checkpoint1, checkpoint2, checkpoint3, checkpoint4 = list(),list(),list(),list()# DEBUG TIME
     
-    startTime = time.clock()  
+    startTime = time.time()  
     
     # initialize the variables 
     N,K = problem.D.shape
@@ -163,8 +164,10 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
     ## Enter the Loop
     Algo.stopCrit = ''
     while not Algo.stopCrit:
+        checkpoint1.append(time.time()) # DEBUG TIME
         #####    One Iteration step    #############
         Algo.Iterate(Screen)
+        checkpoint2.append(time.time()) # DEBUG TIME
         
         #####    Dynamic Screening    ##############
         # dynamic screening
@@ -191,7 +194,8 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
             # screen with the new test
             Screen.SetScreen()                 
             Rate = Screen.GetRate()
-                                
+        
+        checkpoint3.append(time.time()) # DEBUG TIME                        
         Algo.itCount += 1 
         Algo.StopCrit(Screen)      
         
@@ -203,14 +207,20 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
         if mon: # monitoring data
             screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
             xmon = np.append(xmon,Algo.x,axis=1)
+        checkpoint4.append(time.time()) # DEBUG TIME
        
-    duration = time.clock() - startTime
+    duration = time.time() - startTime
     if not(mon):
         monvar = dict()
     else:
         monvar={'xmon':         xmon,
                 'screenmon':    screenmon}
  
+#    print([t2-t1 for t2,t1 in zip(checkpoint2,checkpoint1)]) # DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint3,checkpoint2)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint4,checkpoint3)])
+#    print ""
+    
     if verbose >=1:
         print "solved in %d"%(Algo.itCount)
         
@@ -390,8 +400,11 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
         stop_approx = stop.copy()
         stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(float(normE)**2)
 
+    checkpoint1, checkpoint2, checkpoint3 = list(),list(),list() # DEBUG TIME
+    checkpoint4, checkpoint5, checkpoint6 = list(),list(),list() # DEBUG TIME
+    checkpoint7, checkpoint8 = list(),list() # DEBUG TIME
     
-    startTime = time.clock()  
+    startTime = time.time()  
     
     # initialize the variables 
     N,K = problem.D.shape
@@ -405,17 +418,19 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
     objective = [problem.objective(Algo_approx.x, Screen)]
     rayons = [Screen.R]
     screenrate = [Screen.GetRate()]
-    screenrate_est = [Screen.GetRateEst()]
+    screenrate_est = [Screen.GetRateEst()] # Overhead
     zeros = [K - np.count_nonzero(Algo_approx.x)]
     dGaps = [problem.dualGap(Algo_approx.x,Screen = Screen)]
     if mon: # monitoring data
         xmon = np.array(Algo_approx.x)
         screenmon = np.array(Screen.screen[np.newaxis].T)
-        
+    
     ## Enter the Loop of approximate problem (before switching)
     while not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit:
+        checkpoint1.append(time.time()) # DEBUG TIME
         #####    One Iteration step    #############
         Algo_approx.Iterate(Screen)
+        checkpoint2.append(time.time()) # DEBUG TIME        
         
         #####    Dynamic Screening    ##############
         # dynamic screening
@@ -446,26 +461,30 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
             Screen.SetScreen()
             Rate_old = Rate         # the swtiching criterion need the previous rate
             Rate = Screen.GetRate()
-            Rate_est = Screen.GetRateEst()
-                                
+            Rate_est = Screen.GetRateEst() # Overhead
+
+        checkpoint3.append(time.time()) # DEBUG TIME
         Algo_approx.itCount += 1 
         Algo_approx.StopCrit(Screen)
         
         rayons.append(Screen.newR)
         objective.append(Algo_approx.lastErrs[-1])
         screenrate.append(Rate)
-        screenrate_est.append(Rate_est)
+        screenrate_est.append(Rate_est) # Overhead
         zeros.append( K - np.count_nonzero(Algo_approx.x))
         dGaps.append(Algo_approx.dgap)
         if mon: # monitoring data
             screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
             xmon = np.append(xmon,Algo_approx.x,axis=1)
+        checkpoint4.append(time.time()) # DEBUG TIME
 
-  
+    duration1 = time.time() - startTime #DEBUG TIME
+    
     ## Enter the Loop of original problem
+    # Reinitialisations - Overhead
     switch_it = Algo_approx.itCount
     Screen.TestType = scr_type #'ST1'
-    Screen.init = 0
+    Screen.init = 0 #TODO is it really necessary to reinitialize
     Screen.normE = 0
     
     Algo_approx.stopCrit = ''
@@ -474,16 +493,19 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
     problem.D, problem.D_bis = problem.D_bis, problem.D
     #Algo_approx.D = problem.D
     
+    duration2 = time.time() - startTime  - duration1 #DEBUG TIME
     # Avoiding complexity peak at switching point
-    # screen_est is used on the first iteration instead of screen
+    # screen_est is used on the first iteration instead of screen - Not safe!
 #    screenrate[-1] = Rate_est
 #    rayons[-1] = Screen.newR_est
 #    Screen.screen, Screen.screen_est = Screen.screen_est, Screen.screen
 
 
     while not Algo_approx.stopCrit:
+        checkpoint5.append(time.time()) # DEBUG TIME
         #####    One Iteration step    #############
         Algo_approx.Iterate(Screen)
+        checkpoint6.append(time.time()) # DEBUG TIME
         
         #####    Dynamic Screening    ##############
         # dynamic screening
@@ -510,7 +532,8 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
             # screen with the new test
             Screen.SetScreen()                 
             Rate = Screen.GetRate()
-                                
+
+        checkpoint7.append(time.time()) # DEBUG TIME                                
         Algo_approx.itCount += 1 
         Algo_approx.StopCrit(Screen)      
         
@@ -523,14 +546,27 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
         if mon: # monitoring data
             screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
             xmon = np.append(xmon,Algo_approx.x,axis=1)
-       
-    duration = time.clock() - startTime
+        checkpoint8.append(time.time()) # DEBUG TIME
+    
+    duration3 = time.time() - startTime  - duration2 - duration1 #DEBUG TIME
+    duration = time.time() - startTime
     if not(mon):
         monvar = dict()
     else:
         monvar={'xmon':         xmon,
                 'screenmon':    screenmon}
  
+#    print "DURATION1: approx dict loop  %.3f ms in %d iterations"%(duration1*1000, switch_it) #DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint2,checkpoint1)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint3,checkpoint2)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint4,checkpoint3)])
+#    print "DURATION2  %.3f ms"%(duration2*1000) #DEBUG TIME
+#    print "DURATION3  %.3f ms in %d iterations"%(duration3*1000,Algo_approx.itCount-switch_it) #DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint6,checkpoint5)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint7,checkpoint6)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint8,checkpoint7)])
+#    print ""    
+    
     if verbose >=1:
         print "solved in %d"%(Algo_approx.itCount)
         
@@ -543,6 +579,9 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
                 'zeros':            np.asarray(zeros, dtype=float),
                 'dGaps':            np.asarray(dGaps, dtype=float),
                 'time':             duration,
+                'time1':            duration1, #DEBUG TIME
+                'time2':            duration2, #DEBUG TIME
+                'time3':            duration3, #DEBUG TIME
                 'nbIter':           Algo_approx.itCount,
                 'flops':            flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC,switch_it),
                 'problem':          problem,
@@ -1137,7 +1176,7 @@ class ScreenTestApprox:
         else :
             self.lasso = lasso
         self.problem = problem
-        if not 'scalProd' in dir(self): 
+        if not 'scalProd' in dir(self): #TODO GAP nao precisa disso
             if grad==[]:        
                 self.scalProd = problem.D.ApplyTranspose(problem.y)
             else:
@@ -1245,7 +1284,7 @@ class ScreenTestApprox:
             
         feasDual =  mu*dualPt
         rayvect = feasDual-self.c0
-        self.newR = np.sqrt(rayvect.T.dot(rayvect))     
+        self.newR = np.sqrt(rayvect.T.dot(rayvect))
         
     def SetScreen(self):
         """
@@ -1275,7 +1314,7 @@ class ScreenTestApprox:
             if self.screen.ndim != 1:
                 self.screen = self.screen.flatten()
 
-        # Mimicking the original screening (used by the switching criterion)
+        # Mimicking the original screening (used by the switching criterion) - Overhead
         if self.TestType == "ST1_approx":                    
             screen_est = (self.testvect - self.margin >= -self.newR_est).astype(int)
             self.screen_est = screen_est.flatten() & self.screen_est

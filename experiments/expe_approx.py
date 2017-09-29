@@ -26,7 +26,10 @@ def first(opt =dict(), **keywords):
     Plot one execution of the dynamic screening for given options
      
     to modify default option just do first(algo_type = 'FISTA')...
-    '''
+    '''   
+    #np.random.seed(0)
+    np.random.seed(10) #used for figures with y=X\beta    
+    
     lasso_list = [0.6] #[0.5, 0.75, 0.85]
     
     for lasso in lasso_list:
@@ -51,14 +54,25 @@ def second(opt=dict(), **keywords):
 def first_sukro(opt =dict(), **keywords):
     '''
     Plot one execution of the dynamic screening for given options
+    
+    /!\ This experiment gives different results for each approximation error
+    because the problem is regenerated at each run. The reason for this is that
+    the SuKro dictionary remains unchanged and the 'actual' dictionary is
+    regenerate from it by adding a gaussian noise with a certain variance.
      
     to modify default option just do first(algo_type = 'FISTA')...
     '''
-    lasso_list = [0.3] #[0.5, 0.75, 0.85]
+    #np.random.seed(0)
+    np.random.seed(10) #used for figures with y=X\beta           
+    
+    lasso_list = [0.9] #[0.5, 0.75, 0.85]
     
     for lasso in lasso_list:
-        default =  dict(dict_type = 'sukro', data_type = 'gnoise', lasso=lasso, N=1024, K=4096,\
-                        dict_params = dict(N1 = 32, N2 = 32, K1 = 64, K2 = 64, n_kron = 20),
+        #default =  dict(dict_type = 'sukro', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
+        #                dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100, n_kron = 20),
+        #                stop=dict(rel_tol=1e-8, max_iter=1000), scr_type = "ST1", switching='default')
+        default =  dict(dict_type = 'low-rank', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
+                        dict_params = dict(n_rank = 200),
                         stop=dict(rel_tol=1e-8, max_iter=1000), scr_type = "ST1", switching='default')
         expe = mergeopt(default, opt, keywords)
         expeScrRate(opt=expe)
@@ -70,8 +84,10 @@ def second_sukro(opt=dict(), **keywords):
     you can chosse the dictionary to be gaussian noise or pnoise
     '''        
     np.random.seed(0)
-    default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=1024,K=4096,scr_type = "ST1",\
-                    dict_params = dict(N1 = 32, N2 = 32, K1 = 64, K2 = 64,n_kron = 5),nbRuns=1,switching='default')
+    #default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
+    #                dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=300,switching='default')
+    default = dict(dict_type = 'low-rank',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
+                    dict_params = dict(n_rank = 200),nbRuns=100,switching='default')
     expe = mergeopt(opt, default, keywords)
     res = runLambdas(opt=expe)
     traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )    
@@ -87,45 +103,72 @@ def third(opt=dict(), **keywords):
     traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )
     
 
-def estimateRC(D,opt,total_it=100, verbose=False):
+def estimateRC(D,opt,total_it=1000, verbose=False):
     """
     Estimating practical Relative Complexity of D (the fast dictionary)
     """
     if verbose:    
         print "Estimating RC"
-        
+    
+    mean_time_dense_dot, mean_time_denseT_dot = 0,0
     mean_time_dense, mean_time_denseT, mean_time_struct, mean_time_structT = 0,0,0,0
 
     screen = np.ones(opt['K'],dtype=np.int)
     D_dense = Dict(np.random.randn(opt['N'],opt['K']))
     for k in range(total_it):
-        x = np.random.randn(opt['K'],1) # results do not change if x is sparse
-        xT = np.random.randn(opt['N'],1)
-        ### Dense dictionary ###
-        tic = time.clock()    
+        p = float(k)/total_it
+        
+        x = np.zeros((opt['K'],1))
+        nz = max(int(p*opt['K']),1) # not really bernoulli because the number of active features is deterministic here.
+        idx = opt['K']*np.random.rand(1,nz)
+        x[idx.astype(int)] = np.random.randn(nz,1)
+
+        xT = np.zeros((opt['N'],1))        
+        nz = max(int(p*opt['N']),1) # not really bernoulli because the number of active features is deterministic here.
+        idx = opt['N']*np.random.rand(1,nz)
+        xT[idx.astype(int)] = np.random.randn(nz,1)    
+        
+        #x = np.random.randn(opt['K'],1) # results do not change if x is sparse
+        #xT = np.random.randn(opt['N'],1)
+        
+        ### Dense dictionary with np.dot ###        
+        tic = time.time()    
+        D_dense.Apply(x)
+        toc = time.time()
+        mean_time_dense_dot = mean_time_dense_dot + (toc-tic)/float(total_it)
+        tic = time.time()    
+        D_dense.ApplyTranspose(xT)
+        toc = time.time()
+        mean_time_denseT_dot = mean_time_denseT_dot + (toc-tic)/float(total_it)        
+        ### Dense dictionary ###        
+        tic = time.time()    
         D_dense.ApplyScreen(x,screen) #D_dense.Apply(x)
-        toc = time.clock()
+        toc = time.time()
         mean_time_dense = mean_time_dense + (toc-tic)/float(total_it)
-        tic = time.clock()    
+        tic = time.time()    
         D_dense.ApplyTransposeScreen(xT,screen) #D_dense.ApplyTranspose(xT)
-        toc = time.clock()
+        toc = time.time()
         mean_time_denseT = mean_time_denseT + (toc-tic)/float(total_it)        
         ### Fast Dictionary ###
-        tic = time.clock()    
+        tic = time.time()    
         D.ApplyScreen(x,screen) #D.Apply(x)
-        toc = time.clock()
+        toc = time.time()
         mean_time_struct = mean_time_struct + (toc-tic)/float(total_it)
-        tic = time.clock()    
+        tic = time.time()    
         D.ApplyTransposeScreen(xT,screen) #D.ApplyTranspose(xT)
-        toc = time.clock()
+        toc = time.time()
         mean_time_structT = mean_time_structT + (toc-tic)/float(total_it)            
+    RC_dot = mean_time_struct/mean_time_dense_dot # Comparing to multiplying with np.dot
+    RCT_dot = mean_time_structT/mean_time_denseT_dot
     RC = mean_time_struct/mean_time_dense
     RCT = mean_time_structT/mean_time_denseT
     
-    if verbose:    
+    if verbose:
+        print "RC_dot = %1.3f"%(RC_dot)
+        print "RCT_dot = %1.3f"%(RCT_dot)
         print "RC = %1.3f"%(RC)
         print "RCT = %1.3f"%(RCT)
-    return RC
+    return RC_dot
 
 def expeScrRate(opt={},**keywords):
     """
@@ -137,15 +180,11 @@ def expeScrRate(opt={},**keywords):
     testopt(opt)
     for key, val in opt.items():
         exec(key+'='+ repr(val))
-
-    
-    #np.random.seed(0)
-    np.random.seed(10) #used for figures with y=X\beta
-    
+   
     problem, opt = GP.generate(opt) # Generate the problem
     
     # Evaluate RC (Relative Complexity)
-    if opt['dict_type'] is 'sukro':
+    if opt['dict_type'] is 'sukro' or 'low-rank':
         total_it = 100
         RC = estimateRC(problem.D,opt,total_it,verbose=True)
     else: # otherwise we just assume RC = 0.5
@@ -376,7 +415,7 @@ def traceLambdas(timeRes, nbIter, nbFlops, opt):
             Gstr =''
                         
     ## Time plot
-    if opt['dict_type'] is 'sukro': 
+    if opt['dict_type'] is 'sukro' or 'low-rank': 
         f = plt.figure(figsize=1.05*plt.figaspect(0.6))
         # Dynamic
         plt.plot(pen_param_list,q2_d,'ks-' ,markevery= mkevry,markersize = markersize)  
@@ -538,7 +577,7 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
     
     # Approx Error: 1e-1
     normE = 1e-1*np.ones(1) #*np.ones((problem.D.shape[1],1))
-    if opt['dict_type']=='sukro':
+    if opt['dict_type']=='sukro' or 'low-rank':
         if opt['data_type']=='bernoulli-gaussian':
             D_sukro = copy.copy(problem.D)
             problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
@@ -560,7 +599,7 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
 
     # Approx Error: 1e-2
     normE = 1e-2*np.ones(1) #*np.ones((problem.D.shape[1],1))                            
-    if opt['dict_type']=='sukro':
+    if opt['dict_type']=='sukro' or 'low-rank':
         if opt['data_type']=='bernoulli-gaussian':
             problem.D_bis =  Dict(D_sukro.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
             problem.D_bis.normalize()
@@ -582,7 +621,7 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
 
     # Approx Error: 1e-3
     normE = 1e-3*np.ones(1) #*np.ones((problem.D.shape[1],1))
-    if opt['dict_type']=='sukro':
+    if opt['dict_type']=='sukro' or 'low-rank':
         if opt['data_type']=='bernoulli-gaussian':
             problem.D_bis =  Dict(D_sukro.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
             problem.D_bis.normalize()
@@ -621,7 +660,7 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
                             EmbedTest='noScreen', algo_type=opt['algo_type'], \
                             warm_start = warm_start)  
 
-    if opt['dict_type']=='sukro':
+    if opt['dict_type']=='sukro' or 'low-rank':
         problem.D, problem.D_bis = problem.D_bis, problem.D
 
 
@@ -728,8 +767,8 @@ def runLambdas(opt={},**keywords):
     sig = np.zeros((opt['nbRuns'],opt['N']))
     
     # Evaluate RC (Relative Complexity)
-    if opt['dict_type'] is 'sukro':
-        total_it = 100
+    if opt['dict_type'] is 'sukro' or 'low-rank':
+        total_it = 1000
         RC = estimateRC(problem.D,opt,total_it,verbose=True)
     else: # otherwise we just assume RC = 0.5
         RC = 0.5
