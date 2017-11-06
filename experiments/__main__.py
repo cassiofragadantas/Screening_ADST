@@ -88,6 +88,8 @@ Indicate which experiment to run.
         expe_approx.first_sukro(option)
     elif args.Expe[0]==7: 
         expe_approx.second_sukro(option)
+    elif args.Expe[0]==8: 
+        expe_approx.second_sukro_per_it(option)
     else:
         print 'Experiment number Not valid'
     

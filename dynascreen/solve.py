@@ -146,9 +146,10 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
         else:
             Screen.Initialisation(problem,  lasso = problem.pen_param)
         
-        Screen.RefineR(dualpt,grad)
+        Screen.RefineR(dualpt,grad,Algo.x)
         Screen.SetScreen()
         Rate = Screen.GetRate() 
+        del Screen.feasDual #To ensure it will be recalculated for dgap (Algo.StopCrit)
     else:
         Rate = 0
                 
@@ -189,7 +190,7 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
                 Screen.SetScreen()    
                 
             else: # compute only the new radius
-                Screen.RefineR(Algo.dualpt,Algo.grad)
+                Screen.RefineR(Algo.dualpt,Algo.grad,Algo.x)
                 
             # screen with the new test
             Screen.SetScreen()                 
@@ -210,6 +211,7 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
         checkpoint4.append(time.time()) # DEBUG TIME
        
     duration = time.time() - startTime
+    time_per_it = checkpoint4 - np.append(startTime,checkpoint4[:-1])
     if not(mon):
         monvar = dict()
     else:
@@ -232,6 +234,7 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
                 'zeros':        np.asarray(zeros, dtype=float),
                 'dGaps':        np.asarray(dGaps, dtype=float),
                 'time':         duration,
+                'time_per_it':  time_per_it,
                 'nbIter':       Algo.itCount,
                 'flops':        flop_calc(EmbedTest,K,N,screenrate,zeros,Gr),
                 'problem':      problem,
@@ -285,7 +288,7 @@ def switching_criterion(N, K, RC=1, Rate=0, Rate_old=0, Rate_est=0):
     
     return (crit_RC or crit_Rate)
 
-def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None, stop = dict(), switching = '',
+def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None, Gr=[], problem=None, stop = dict(), switching = '',
                L='backtracking',scr_type="Dome",EmbedTest='dynamic',mon=False, 
                algo_type ='FISTA', warm_start = None, verbose=0):
     """
@@ -391,14 +394,15 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
         L = LA.norm(problem.D.data,ord=2)**2 
 
     # Convergence switching criterion
-    if switching == 'screening_only': # No convergence criterion for switching
-        if 'max_iter' in stop.keys():
-            stop_approx = {'max_iter':stop["max_iter"]}
+    stop_approx = stop.copy()
+    if switching is not 'screening_only': # No convergence criterion for switching
+        if 'dgap_tol' in  stop.keys():
+            # gap relative variation - switching criterion
+            #stop_approx["dgap_rel_tol"] = 5e-3
+            # gap absolute variation - switching criterion
+            stop_approx["dgap_tol"] = stop["dgap_tol"]*2e5*float(normE)
         else:
-            stop_approx = dict('max_iter',1000)
-    else: # DEFAULT: heuristic convergence criterion
-        stop_approx = stop.copy()
-        stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(float(normE)**2)
+            stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(float(normE)**2)
 
     checkpoint1, checkpoint2, checkpoint3 = list(),list(),list() # DEBUG TIME
     checkpoint4, checkpoint5, checkpoint6 = list(),list(),list() # DEBUG TIME
@@ -445,17 +449,17 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
                         #scalProd = -Algo_approx.grad
                         
                         Screen.Initialisation(problem, scalProd, \
-                                              lasso=problem.pen_param, normE = normE)
+                                              lasso=problem.pen_param, normE = normE, norm2E = norm2E)
                 else:
                     if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
                         Screen.Initialisation(problem)                    
                     else:
-                        Screen.Initialisation(problem, lasso = problem.pen_param, normE = normE)
+                        Screen.Initialisation(problem, lasso = problem.pen_param, normE = normE, norm2E = norm2E)
                     
-                #Screen.SetScreen()    
+                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
                 
             else: # compute only the new radius
-                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad)
+                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
                 
             # screen with the new test
             Screen.SetScreen()
@@ -479,17 +483,22 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
         checkpoint4.append(time.time()) # DEBUG TIME
 
     duration1 = time.time() - startTime #DEBUG TIME
+    time_per_it = checkpoint4 - np.append(startTime,checkpoint4[:-1])
     
     ## Enter the Loop of original problem
     # Reinitialisations - Overhead
     switch_it = Algo_approx.itCount
     Screen.TestType = scr_type #'ST1'
     Screen.init = 0 #TODO is it really necessary to reinitialize
-    Screen.normE = 0
     
     Algo_approx.stopCrit = ''
     #Algo_approx.D = problem.D_bis # artigo
-    Algo_approx.stopParams["rel_tol"] = stop["rel_tol"]
+    if 'dgap_tol' in  stop.keys():
+        Algo_approx.stopParams["dgap_tol"] = stop["dgap_tol"]
+        Algo_approx.stopParams["dgap_rel_tol"] = -np.inf
+    else:
+        Algo_approx.stopParams["rel_tol"] = stop["rel_tol"]
+        
     problem.D, problem.D_bis = problem.D_bis, problem.D
     #Algo_approx.D = problem.D
     
@@ -524,10 +533,10 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
                     else:
                         Screen.Initialisation(problem, lasso = problem.pen_param)
                     
-                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad)
+                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
                 
             else: # compute only the new radius
-                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad)               
+                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)               
                 
             # screen with the new test
             Screen.SetScreen()                 
@@ -550,6 +559,8 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
     
     duration3 = time.time() - startTime  - duration2 - duration1 #DEBUG TIME
     duration = time.time() - startTime
+    time_per_it = np.append(time_per_it, checkpoint8 - np.append(checkpoint4[-1],checkpoint8[:-1]))
+
     if not(mon):
         monvar = dict()
     else:
@@ -584,6 +595,7 @@ def solver_approx(y=None, D=None, RC=1, normE=0, lasso=None, Gr=[], problem=None
                 'time3':            duration3, #DEBUG TIME
                 'nbIter':           Algo_approx.itCount,
                 'flops':            flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC,switch_it),
+                'time_per_it':      time_per_it,
                 'problem':          problem,
                 'stopCrit':         Algo_approx.stopCrit,
                 'monVar':           monvar,
@@ -627,7 +639,7 @@ class OptimAlgo(object):
     def objective(self,x,Screen):
         return self.problem.objective(x, Screen)
         
-    def initialization(self, L=None, warm_start = None, stop = dict()): 
+    def initialization(self, L=None, warm_start = None, stop = dict(rel_tol=1e-7,max_iter=200)): 
         
         """
         Initialized the algorithm and the variables with the corresonding value of lasso
@@ -643,12 +655,14 @@ class OptimAlgo(object):
         self.L=L
         self.prevIter = 2
         self.lastErrs = list()     
+        self.lastDgaps = list()   
         self.stopCrit = ''
         self.stopParams = { 'abs_tol':      -np.inf,
-                            'rel_tol':      1e-7,
+                            'rel_tol':      -np.inf, #1e-7,
                             'conv_speed':   -np.inf,
-                            'max_iter':     200,
-                            'dgap_tol':     -np.inf}
+                            'max_iter':      np.inf,
+                            'dgap_tol':     -np.inf,
+                            'dgap_rel_tol': -np.inf}
         try :
             if set(stop.keys()).issubset(set(self.stopParams.keys())):           
                 self.stopParams.update(stop)
@@ -685,6 +699,27 @@ class OptimAlgo(object):
         """
         Compute the stopping criterion for the algorithm
         """
+        self.stopCrit =''
+        
+        # Calculate Dual Gap if necessary
+        if (self.stopParams['dgap_tol'] != -np.inf) or (self.stopParams['dgap_rel_tol'] != -np.inf):
+            if Screen.TestType in {"GAP","GAP_approx"} and Screen.dgap != self.dgap: # gap has already been calculated for the screening (GAP Safe dynamic rule)
+                self.dgap = Screen.dgap
+            else:
+                if hasattr(Screen, 'feasDual'): # dynamic screening - feasible point already calculated
+                    feasDual = Screen.feasDual
+                else: # calculate dual feasible point
+                    dualN2 = self.dualpt.T.dot(self.dualpt)
+                    gradNinf = np.max(np.abs(self.grad))
+                    mu = max(-1/gradNinf,min(1/gradNinf,self.dualpt.T.dot(self.y/self.lasso)/dualN2))
+                    feasDual = mu*self.dualpt
+                    
+                self.dgap = self.problem.dualGap(self.x,dualpt=self.dualpt, grad=self.grad,  feasDual = feasDual)
+
+            self.lastDgaps.append(self.dgap)
+            if np.size(self.lastDgaps) > self.prevIter:
+                self.lastDgaps.pop(0)
+
         self.lastErrs.append(self.loss+self.lasso*self.reg)
         # not able to take the difference when less than two 
         # elements have been computed        
@@ -692,13 +727,12 @@ class OptimAlgo(object):
             return 1
         if np.size(self.lastErrs) > self.prevIter:
             self.lastErrs.pop(0) 
-          
-        self.stopCrit =''     
-        if self.stopParams['dgap_tol'] != -np.inf: 
-            self.dgap = self.problem.dualGap(self.x,dualpt=self.dualpt, grad=self.grad)
-            #FIXME strange the dual is sometime negative
-            if abs(self.dgap) < self.stopParams['dgap_tol']:
-                self.stopCrit += 'dual_gap' + str(self.stopParams['dgap_tol'])
+
+        if abs(self.dgap) < self.stopParams['dgap_tol']:
+            self.stopCrit += 'dual_gap' + str(self.stopParams['dgap_tol'])
+        
+        if (max(self.lastDgaps) - min(self.lastDgaps))/(self.lastDgaps[-1] + 1e-10) < self.stopParams['dgap_rel_tol']:
+            self.stopCrit += 'Dgap_Tol'+ str(self.stopParams['dgap_rel_tol'])
 
         if self.lastErrs[-1] < self.stopParams['abs_tol']:
             self.stopCrit += 'Abs_Tol'+ str(self.stopParams['abs_tol'])
@@ -965,7 +999,6 @@ class ScreenTest:
     Type : string
         Name of the test ('ST1, 'ST3' or 'Dome')
     """
-    #TODO
     
 
     def __init__(self, K, Type="ST3"):
@@ -973,6 +1006,7 @@ class ScreenTest:
         self.screen = np.ones(K,dtype=np.int)
         self.R = np.inf
         self.newR = np.inf
+        self.dgap = np.inf
         self.star = -1
         self.lstar = -1
         self.init = 0
@@ -1023,6 +1057,8 @@ class ScreenTest:
                 self.c = self.c0 - (self.lstar/self.lasso-1)*self.dstar
                 self.dist = (self.lstar/self.lasso-1)**2
                 self.testvect = np.abs(problem.D.ApplyTranspose(self.c)).ravel() - 1
+            elif self.TestType == "GAP":
+                self.testvect = - 1
             elif self.TestType == "Dome":
                 self.dstar = problem.D.data[:,self.star:self.star+1]*\
                         np.sign(self.scalProd[self.star,0])
@@ -1066,14 +1102,14 @@ class ScreenTest:
             elif self.TestType == "Dome":
                 raise ValueError(" The Dome test does not exist for Group-Lasso")
             else:
-                raise ValueError("Not Valid Screening test, must be 'ST1','ST3' or 'Dome'")
+                raise ValueError("Not Valid Screening test, must be 'ST1','ST3','GAP' or 'Dome'")
                     
         self.newR = 1/self.lasso-1/self.lstar
         self.R = self.newR+1
         self.init = 1
      
      
-    def RefineR(self, dualPt, grad):
+    def RefineR(self, dualPt, grad, x):
         """
         Refines the radius thanks to dual scaling with the dualpoint and the grad already computed
         """
@@ -1087,9 +1123,14 @@ class ScreenTest:
             mu = max(-1/groupGradNinf,\
                 min(1/groupGradNinf,dualPt.T.dot(self.c0)/dualN2))    
             
-        feasDual =  mu*dualPt
-        rayvect = feasDual-self.c0
-        self.newR = np.sqrt(rayvect.T.dot(rayvect))    
+        self.feasDual =  mu*dualPt
+        if self.TestType == "GAP":
+            self.dgap = self.problem.dualGap(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual)
+            self.newR = np.sqrt(2*(self.dgap))/self.lasso
+            self.testvect = - 1 -mu*np.abs(grad) # Addind |x^T c| which changes since c = \theta            
+        else:
+            rayvect = self.feasDual-self.c0
+            self.newR = np.sqrt(rayvect.T.dot(rayvect))    
         
     def SetScreen(self):
         """
@@ -1097,7 +1138,7 @@ class ScreenTest:
         """ 
         if self.newR < self.R:        
             self.R = self.newR 
-            if self.TestType == "ST1":
+            if self.TestType == "ST1" or self.TestType == "GAP":
                 rScr = self.R 
                 scrtmp = (self.testvect >= -rScr).astype(int)
             elif self.TestType == "ST3":
@@ -1136,8 +1177,6 @@ class ScreenTestApprox:
     Type : string
         Name of the test ('ST1, 'ST3' or 'Dome')
     """
-    #TODO
-    
 
     def __init__(self, K, Type="ST3"):
         self.TestType = Type    
@@ -1145,6 +1184,7 @@ class ScreenTestApprox:
         self.screen_est = np.ones(K,dtype=np.int)
         self.R = np.inf
         self.newR = np.inf
+        self.dgap = np.inf
         self.star = -1
         self.lstar = -1
         self.init = 0
@@ -1152,7 +1192,7 @@ class ScreenTestApprox:
         
                 
     
-    def Initialisation(self,problem, grad=[], lasso=None, normE=0):
+    def Initialisation(self,problem, grad=[], lasso=None, normE=np.zeros(1), norm2E=0):
         """
         Initialize all fields of the instance acoording to the given parameters
         
@@ -1176,13 +1216,16 @@ class ScreenTestApprox:
         else :
             self.lasso = lasso
         self.problem = problem
-        if not 'scalProd' in dir(self): #TODO GAP nao precisa disso
+        if not 'scalProd' in dir(self):
+            #if self.TestType in {"GAP","GAP_approx"}: #TODO the product (X^T y) is not necessary
+            #    self.scalProd = np.zeros(1)
             if grad==[]:        
                 self.scalProd = problem.D.ApplyTranspose(problem.y)
             else:
                 self.scalProd = grad
             
         self.normE = normE
+        self.norm2E2 = norm2E**2
 
 
         if problem.__class__.__name__ == 'Lasso':    
@@ -1198,11 +1241,15 @@ class ScreenTestApprox:
                 #self.margin = 1/self.lasso*normE.ravel()*np.sqrt(problem.y.T.dot(problem.y)) # CONFIG: when the original atoms, no margin is needed
                 self.c = self.c0     
                 self.testvect = 1/self.lasso*np.abs(self.scalProd).ravel() + self.margin - 1
-            elif self.TestType == "ST3" or self.TestType == "ST3_approx":
+            elif self.TestType in {"ST3","ST3_approx"}:
                 self.dstar = problem.D.data[:,self.star:self.star+1]*np.sign(self.scalProd[self.star,0])
                 self.c = self.c0 - (self.lstar/self.lasso-1)*self.dstar
                 self.dist = (self.lstar/self.lasso-1)**2
                 self.testvect = np.abs(problem.D.ApplyTranspose(self.c)).ravel() - 1
+            elif self.TestType in {"GAP","GAP_approx"}:                
+                self.margin = 1/self.lasso*normE.ravel()*np.sqrt(problem.y.T.dot(problem.y)) # It is required here, since |x^T c| uses the approximate atoms. Differently from ST1_approx
+                self.testvect = self.margin - 1
+                self.normy = np.sqrt(self.problem.normy2)
             elif self.TestType == "Dome":
                 self.dstar = problem.D.data[:,self.star:self.star+1]*\
                         np.sign(self.scalProd[self.star,0])
@@ -1210,7 +1257,7 @@ class ScreenTestApprox:
                 self.Dtdstar = problem.D.ApplyTranspose(self.dstar).ravel()
                 self.testvect = self.scalProd.ravel()
             else:
-                raise ValueError("Not Valid Screening test, must be 'ST1','ST3' or 'Dome'")
+                raise ValueError("Not Valid Screening test, must be 'ST1','ST3', 'GAP' or 'Dome'")
                 
             if "matrix" in self.testvect.__class__.__name__:
                 self.testvect = np.array(self.testvect).ravel() 
@@ -1256,13 +1303,14 @@ class ScreenTestApprox:
         self.init = 1
      
      
-    def RefineR(self, dualPt, grad):
+    def RefineR(self, dualPt, grad, x, Algo=[]):
         """
         Refines the radius thanks to dual scaling with the dualpoint and the grad already computed
         """
         dualN2 = dualPt.T.dot(dualPt)
+        # Calculation of mu (feasibility multiplication coefficient)
         if self.problem.__class__.__name__ == "Lasso":
-            if self.TestType == "ST1_approx" or self.TestType == "ST3_approx":
+            if self.TestType in {"ST1_approx","ST3_approx","GAP_approx"}:
                 gradNinf = np.max(np.abs(grad) + self.normE*np.sqrt(dualN2) )
                 mu = max(-1/gradNinf,min(1/gradNinf,dualPt.T.dot(self.c0)/dualN2))
                 
@@ -1271,8 +1319,6 @@ class ScreenTestApprox:
                 mu_est = max(-1/gradNinf,min(1/gradNinf,dualPt.T.dot(self.c0)/dualN2))
                 
                 feasDual_est =  mu_est*dualPt
-                rayvect_est = feasDual_est-self.c0
-                self.newR_est = np.sqrt(rayvect_est.T.dot(rayvect_est)) 
             else:
                 gradNinf = np.max(np.abs(grad) )
                 mu = max(-1/gradNinf,min(1/gradNinf,dualPt.T.dot(self.c0)/dualN2))        
@@ -1281,10 +1327,29 @@ class ScreenTestApprox:
             groupGradNinf = np.max(grnorm/np.asarray([wg for ind,(g,wg) in enumerate(self.problem.Gr)]))
             mu = max(-1/groupGradNinf,\
                 min(1/groupGradNinf,dualPt.T.dot(self.c0)/dualN2))    
-            
-        feasDual =  mu*dualPt
-        rayvect = feasDual-self.c0
-        self.newR = np.sqrt(rayvect.T.dot(rayvect))
+
+        # Dual feasible point
+        self.feasDual =  mu*dualPt
+        
+        # Radius calculation
+        if self.TestType in {"GAP","GAP_approx"}:
+            self.dgap = self.problem.dualGap(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual)
+            normE2x2 = self.norm2E2*x.T.dot(x)
+            margin_dgap = 0.5*normE2x2 + np.sqrt(normE2x2*dualN2) #*(1 + self.lasso*self.normy/(2*dualN2)) dual margin - not necessary
+            self.newR = np.sqrt(2*(self.dgap + margin_dgap))/self.lasso
+            self.testvect = self.margin - 1 -mu*np.abs(grad) # Addind |x^T c| which changes since c = \theta
+            # Unsafe radius - for switching criterion
+            if self.TestType == "GAP_approx":
+                dgap_est = self.problem.dualGap(x,dualpt=dualPt, grad= grad, feasDual = feasDual_est)
+                self.newR_est = np.sqrt(2*dgap_est)/self.lasso
+                self.testvect_est = self.margin - 1 -mu_est*np.abs(grad)
+        else: #ST1, ST3
+            rayvect = self.feasDual-self.c0
+            self.newR = np.sqrt(rayvect.T.dot(rayvect))
+            # Unsafe radius - for switching criterion
+            if self.TestType in {"ST1_approx","ST3_approx"}:
+                rayvect_est = feasDual_est-self.c0
+                self.newR_est = np.sqrt(rayvect_est.T.dot(rayvect_est)) 
         
     def SetScreen(self):
         """
@@ -1292,10 +1357,10 @@ class ScreenTestApprox:
         """ 
         if self.newR < self.R:        
             self.R = self.newR 
-            if self.TestType == "ST1" or self.TestType == "ST1_approx": 
+            if self.TestType in {"ST1","ST1_approx","GAP","GAP_approx"}: 
                 rScr = self.R 
                 scrtmp = (self.testvect >= -rScr).astype(int)
-            elif self.TestType == "ST3" or self.TestType == "ST3_approx":
+            elif self.TestType in {"ST3","ST3_approx"}:
                 rScr = (np.sqrt(max(1e-20,self.R**2-self.dist)))
                 scrtmp = (self.testvect >= -rScr).astype(int)
             elif self.TestType == "Dome":
@@ -1315,7 +1380,7 @@ class ScreenTestApprox:
                 self.screen = self.screen.flatten()
 
         # Mimicking the original screening (used by the switching criterion) - Overhead
-        if self.TestType == "ST1_approx":                    
+        if self.TestType in {"ST1_approx","GAP_approx"}:                    
             screen_est = (self.testvect - self.margin >= -self.newR_est).astype(int)
             self.screen_est = screen_est.flatten() & self.screen_est
         elif self.TestType == "ST3_approx":

@@ -30,13 +30,11 @@ class Dict:
         self.opType=opType
         
         if opType=="matrix":
-            #self.data = data #This line makes the dictionary C-contiguous
             self.shape = self.data.shape
             if not self.normalized:
                 self.normalize()
         # Initializing sukro dictionary
         elif opType=="sukro":
-            #self.data = data #This line makes the dictionary C-contiguous
             self.shape = self.data.shape
             # Submatrices - provided via input 'params'
             #TODO assert that A and B are provided in 'params'

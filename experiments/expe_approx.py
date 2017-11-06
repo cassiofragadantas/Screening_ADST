@@ -62,18 +62,19 @@ def first_sukro(opt =dict(), **keywords):
      
     to modify default option just do first(algo_type = 'FISTA')...
     '''
-    #np.random.seed(0)
-    np.random.seed(10) #used for figures with y=X\beta           
+    np.random.seed(0)
+    #np.random.seed(10) #used for figures with y=X\beta           
     
-    lasso_list = [0.9] #[0.5, 0.75, 0.85]
+    lasso_list = [0.5] #[0.5, 0.75, 0.85]
     
     for lasso in lasso_list:
-        #default =  dict(dict_type = 'sukro', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
-        #                dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100, n_kron = 20),
-        #                stop=dict(rel_tol=1e-8, max_iter=1000), scr_type = "ST1", switching='default')
-        default =  dict(dict_type = 'low-rank', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
-                        dict_params = dict(n_rank = 200),
-                        stop=dict(rel_tol=1e-8, max_iter=1000), scr_type = "ST1", switching='default')
+
+        default =  dict(dict_type = 'sukro', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
+                        dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100, n_kron = 20),
+                        stop=dict(dgap_tol=5e-6, max_iter=1000), scr_type = "GAP", switching='default')
+#        default =  dict(dict_type = 'low-rank', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
+#                        dict_params = dict(n_rank = 200),
+#                        stop=dict(rel_tol=1e-8, max_iter=1000), scr_type = "ST1", switching='default')
         expe = mergeopt(default, opt, keywords)
         expeScrRate(opt=expe)
 
@@ -84,13 +85,31 @@ def second_sukro(opt=dict(), **keywords):
     you can chosse the dictionary to be gaussian noise or pnoise
     '''        
     np.random.seed(0)
-    #default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
-    #                dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=300,switching='default')
-    default = dict(dict_type = 'low-rank',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
-                    dict_params = dict(n_rank = 200),nbRuns=100,switching='default')
+    default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
+                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=100,\
+                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default')
+    #default = dict(dict_type = 'low-rank',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
+    #                dict_params = dict(n_rank = 200),nbRuns=100,switching='default')
     expe = mergeopt(opt, default, keywords)
     res = runLambdas(opt=expe)
     traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )    
+
+def second_sukro_per_it(opt=dict(), **keywords):
+    '''
+    Plot the normalized time per iteration for a synthetic Lasso problem
+    versus the penalization parameter \lambda/\lambda_*
+    you can chosse the dictionary to be gaussian noise or pnoise
+    '''        
+    #np.random.seed(0)
+    default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
+                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=1,\
+                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default', samp=100)
+    #default = dict(dict_type = 'low-rank',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
+    #                dict_params = dict(n_rank = 200),nbRuns=100,switching='default')
+    expe = mergeopt(opt, default, keywords)
+    res = runLambdas_per_it(opt=expe)
+    #traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )
+    traceLambdas_per_it(res['timePerIt'], res['nbIter'],expe )
     
 def third(opt=dict(), **keywords):
     '''
@@ -108,7 +127,7 @@ def estimateRC(D,opt,total_it=1000, verbose=False):
     Estimating practical Relative Complexity of D (the fast dictionary)
     """
     if verbose:    
-        print "Estimating RC"
+        print "Estimating RC with %d runs"%(total_it)
     
     mean_time_dense_dot, mean_time_denseT_dot = 0,0
     mean_time_dense, mean_time_denseT, mean_time_struct, mean_time_structT = 0,0,0,0
@@ -184,7 +203,7 @@ def expeScrRate(opt={},**keywords):
     problem, opt = GP.generate(opt) # Generate the problem
     
     # Evaluate RC (Relative Complexity)
-    if opt['dict_type'] is 'sukro' or 'low-rank':
+    if opt['dict_type']  in {'sukro','low-rank'}:
         total_it = 100
         RC = estimateRC(problem.D,opt,total_it,verbose=True)
     else: # otherwise we just assume RC = 0.5
@@ -415,7 +434,7 @@ def traceLambdas(timeRes, nbIter, nbFlops, opt):
             Gstr =''
                         
     ## Time plot
-    if opt['dict_type'] is 'sukro' or 'low-rank': 
+    if opt['dict_type']  in {'sukro','low-rank'}: 
         f = plt.figure(figsize=1.05*plt.figaspect(0.6))
         # Dynamic
         plt.plot(pen_param_list,q2_d,'ks-' ,markevery= mkevry,markersize = markersize)  
@@ -575,69 +594,71 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
     
     print r'lambda/lambda* = '+str(opt['lasso']) 
     
+    E = np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K'])
+    norm2E = np.linalg.norm(E,2)
     # Approx Error: 1e-1
     normE = 1e-1*np.ones(1) #*np.ones((problem.D.shape[1],1))
-    if opt['dict_type']=='sukro' or 'low-rank':
+    if opt['dict_type'] in {'sukro','low-rank'}:
         if opt['data_type']=='bernoulli-gaussian':
             D_sukro = copy.copy(problem.D)
-            problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+            problem.D_bis =  Dict(problem.D.data + normE*E)
             problem.D_bis.normalize()
             problem, opt = GP.generate(opt,problem.D_bis) # Generate the problem
             problem.D_bis = D_sukro
             problem.D, problem.D_bis = problem.D_bis, problem.D # start with the approximate (fast) dictionary            
         else:
-            problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+            problem.D_bis =  Dict(problem.D.data + normE*E)
             problem.D_bis.normalize()
     else:
-        problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+        problem.D_bis =  Dict(problem.D.data + normE*E)
         problem.D_bis.normalize()    
         problem.D, problem.D_bis = problem.D_bis, problem.D # The approximate dictionary is used
-    res_dyn_approx = solver_approx(problem=problem, normE=normE, RC=RC, L=opt['L'], stop=opt['stop'], switching=opt['switching'], \
+    res_dyn_approx = solver_approx(problem=problem, normE=normE, norm2E = 0*norm2E, RC=RC, L=opt['L'], stop=opt['stop'], switching=opt['switching'], \
                             scr_type=opt['scr_type'], \
                             EmbedTest='dynamic', algo_type=opt['algo_type'], \
                             warm_start = warm_start)
 
     # Approx Error: 1e-2
     normE = 1e-2*np.ones(1) #*np.ones((problem.D.shape[1],1))                            
-    if opt['dict_type']=='sukro' or 'low-rank':
+    if opt['dict_type'] in {'sukro','low-rank'}:
         if opt['data_type']=='bernoulli-gaussian':
-            problem.D_bis =  Dict(D_sukro.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+            problem.D_bis =  Dict(D_sukro.data + normE*E)
             problem.D_bis.normalize()
             problem, opt = GP.generate(opt,problem.D_bis) # Generate the problem
             problem.D_bis = D_sukro
             problem.D, problem.D_bis = problem.D_bis, problem.D # start with the approximate (fast) dictionary            
         else:
             problem.D, problem.D_bis = problem.D_bis, problem.D
-            problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+            problem.D_bis =  Dict(problem.D.data + normE*E)
             problem.D_bis.normalize()
     else:
-        problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+        problem.D_bis =  Dict(problem.D.data + normE*E)
         problem.D_bis.normalize()
         problem.D, problem.D_bis = problem.D_bis, problem.D # The approximate dictionary is used
-    res_dyn_approx2 = solver_approx(problem=problem, normE=normE, RC=RC, L=opt['L'], stop=opt['stop'],switching=opt['switching'],\
+    res_dyn_approx2 = solver_approx(problem=problem, normE=normE, norm2E = 0, RC=RC, L=opt['L'], stop=opt['stop'],switching=opt['switching'],\
                             scr_type=opt['scr_type'], \
                             EmbedTest='dynamic', algo_type=opt['algo_type'], \
                             warm_start = warm_start) 
 
     # Approx Error: 1e-3
     normE = 1e-3*np.ones(1) #*np.ones((problem.D.shape[1],1))
-    if opt['dict_type']=='sukro' or 'low-rank':
+    if opt['dict_type'] in {'sukro','low-rank'}:
         if opt['data_type']=='bernoulli-gaussian':
-            problem.D_bis =  Dict(D_sukro.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+            problem.D_bis =  Dict(D_sukro.data + normE*E)
             problem.D_bis.normalize()
             problem, opt = GP.generate(opt,problem.D_bis) # Generate the problem
             problem.D_bis = D_sukro
             problem.D, problem.D_bis = problem.D_bis, problem.D # start with the approximate (fast) dictionary            
         else:
             problem.D, problem.D_bis = problem.D_bis, problem.D
-            problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+            problem.D_bis =  Dict(problem.D.data + normE*E)
             problem.D_bis.normalize()
     else:
-        problem.D_bis =  Dict(problem.D.data + normE*np.sqrt(1./opt['N'])*np.random.randn(opt['N'],opt['K']))
+        problem.D_bis =  Dict(problem.D.data + normE*E)
         problem.D_bis.normalize()
         problem.D, problem.D_bis = problem.D_bis, problem.D # The approximate dictionary is used
     
-    res_dyn_approx3 = solver_approx(problem=problem, normE=normE, RC=RC, L=opt['L'], stop=opt['stop'],switching=opt['switching'],\
+    res_dyn_approx3 = solver_approx(problem=problem, normE=normE, norm2E = 0, RC=RC, L=opt['L'], stop=opt['stop'],switching=opt['switching'],\
                             scr_type=opt['scr_type'], \
                             EmbedTest='dynamic', algo_type=opt['algo_type'], \
                             warm_start = warm_start)                             
@@ -660,7 +681,7 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
                             EmbedTest='noScreen', algo_type=opt['algo_type'], \
                             warm_start = warm_start)  
 
-    if opt['dict_type']=='sukro' or 'low-rank':
+    if opt['dict_type'] in {'sukro','low-rank'}:
         problem.D, problem.D_bis = problem.D_bis, problem.D
 
 
@@ -767,8 +788,8 @@ def runLambdas(opt={},**keywords):
     sig = np.zeros((opt['nbRuns'],opt['N']))
     
     # Evaluate RC (Relative Complexity)
-    if opt['dict_type'] is 'sukro' or 'low-rank':
-        total_it = 1000
+    if opt['dict_type'] in {'sukro','low-rank'}:
+        total_it = 10000
         RC = estimateRC(problem.D,opt,total_it,verbose=True)
     else: # otherwise we just assume RC = 0.5
         RC = 0.5
@@ -813,3 +834,207 @@ def runLambdas(opt={},**keywords):
             'opt': opt }
     return ret
     
+    
+def runLambdas_per_it(opt={},**keywords): #TODO merge with runLambdas
+    """
+    Run the Algorithm for a fix problem with all the value of lambda/lambda*
+    in pen_param_list
+    
+    Return the results for opt['nbRuns'] problems
+    """
+    #### handles options
+    default = default_expe()
+                
+    opt = mergeopt(opt, default, keywords)
+#    for key, val in opt.items():
+#        exec(key+'='+ repr(val))
+        
+    #pen_param_list = make_pen_param_list(opt['samp'])
+    pen_param_list = np.logspace(-2,0,num=opt['samp']) # TODO modified for log spacing between 10^{-2} and 10^{0}
+    #### run the algorithm if needed
+    if (not opt['recalc']) and (make_file_name(opt)+'_done.npz') in os.listdir('./ResSynthData'):
+        print 'experiment already computed'        
+        Data = np.load('./ResSynthData/'+make_file_name(opt)+'_done.npz' )
+        if 'time' in Data.keys():
+            timeRes = Data['time'][()]
+        else:
+            timeRes = Data['timeRes'][()]
+        if 'matNormTime' in Data['opt'][()].keys():
+            opt['matNormTime'] = Data['opt'][()]['matNormTime']
+        nbIter = Data['nbIter'][()]
+        nbFlops = Data['nbFlops'][()]
+        timePerIt = Data['timePerIt'][()]
+#        if opt['disp_fig'] or not (make_file_name(opt)+'_Simu_relNoScreen.pdf') in\
+#            os.listdir('./ResSynthData'):
+#            traceLambdas( timeRes, nbIter, nbFlops ,opt )
+        ret = { 'timeRes' : timeRes, \
+                'nbIter': nbIter, \
+                'nbFlops': nbFlops, \
+                'timePerIt': timePerIt, \
+                'opt': opt }
+        return ret
+ 
+    opt['lasso'] = 0.99           
+    problem, opt = GP.generate(opt) 
+    opt['K'] = problem.D.shape[1]
+    
+    avg = opt['nbRuns']
+    nblambdas = len(pen_param_list)
+    timeRes = dict(noScreen=np.zeros((nblambdas,avg), dtype = float),\
+                static=np.zeros((nblambdas,avg), dtype = float),\
+                dynamic=np.zeros((nblambdas,avg), dtype = float), \
+                dynamic_approx=np.zeros((nblambdas,avg), dtype = float), \
+                dynamic_approx2=np.zeros((nblambdas,avg), dtype = float), \
+                dynamic_approx3=np.zeros((nblambdas,avg), dtype = float))
+                
+    nbIter = dict(noScreen=np.zeros((nblambdas,avg)),\
+                static=np.zeros((nblambdas,avg)),\
+                dynamic=np.zeros((nblambdas,avg)), \
+                dynamic_approx=np.zeros((nblambdas,avg)), \
+                dynamic_approx2=np.zeros((nblambdas,avg)), \
+                dynamic_approx3=np.zeros((nblambdas,avg)))
+                
+    nbFlops = dict(noScreen=np.zeros((nblambdas,avg), dtype = float),\
+                static=np.zeros((nblambdas,avg), dtype = float),\
+                dynamic=np.zeros((nblambdas,avg), dtype = float), \
+                dynamic_approx=np.zeros((nblambdas,avg), dtype = float), \
+                dynamic_approx2=np.zeros((nblambdas,avg), dtype = float), \
+                dynamic_approx3=np.zeros((nblambdas,avg), dtype = float))                
+                
+    xFinal = dict(noScreen=np.zeros((nblambdas,avg,opt['K'])),\
+                static=np.zeros((nblambdas,avg,opt['K'])),\
+                dynamic=np.zeros((nblambdas,avg,opt['K'])),\
+                dynamic_approx=np.zeros((nblambdas,avg,opt['K'])),\
+                dynamic_approx2=np.zeros((nblambdas,avg,opt['K'])),\
+                dynamic_approx3=np.zeros((nblambdas,avg,opt['K'])))
+                
+    #TODO replace 1000 by max_iter in opt    
+    timePerIt = dict(noScreen=np.zeros((nblambdas,1000,avg), dtype = float),\
+                static=np.zeros((nblambdas,1000,avg), dtype = float),\
+                dynamic=np.zeros((nblambdas,1000,avg), dtype = float), \
+                dynamic_approx=np.zeros((nblambdas,1000,avg), dtype = float), \
+                dynamic_approx2=np.zeros((nblambdas,1000,avg), dtype = float), \
+                dynamic_approx3=np.zeros((nblambdas,1000,avg), dtype = float))
+                
+    sig = np.zeros((opt['nbRuns'],opt['N']))
+    
+    # Evaluate RC (Relative Complexity)
+    if opt['dict_type'] in {'sukro','low-rank'}:
+        total_it = 1
+        RC = estimateRC(problem.D,opt,total_it,verbose=True)
+    else: # otherwise we just assume RC = 0.5
+        RC = 0.5
+    print "RC = %1.2f"%(RC)    
+
+    for j in range(avg):
+        start = None
+        res = None
+        problem, opt = GP.generate(opt, problem.D)
+
+        star,lstar = problem.getStar() 
+        sig[j,:] = problem.y.flatten()
+        for i,lasso_ in enumerate(pen_param_list[::-1]):
+            if not opt['wstart']:
+                start = None
+            elif res!=None:
+                start = res['noScreen']
+            opt['lasso'] = lasso_
+            problem.pen_param = opt['lasso']*lstar
+            timeIt, nbIt, res, flops, junk, junk1, junk2, junk3, junk_ns = \
+                run3versions(problem,RC,opt,start)
+            for key in timeRes.iterkeys(): 
+                timeRes[key][nblambdas-i-1,j] = timeIt[key]
+                nbIter[key][nblambdas-i-1,j] = nbIt[key]
+                nbFlops[key][nblambdas-i-1,j] = flops[key]
+                if not opt['dict_type'] =="MNIST"  :
+                    xFinal[key][nblambdas-i-1,j] = res[key].flatten()
+                    
+            timePerIt['noScreen'][nblambdas-i-1,:,j] = np.lib.pad(junk_ns['time_per_it'], (0,1000-junk_ns['time_per_it'].size), 'constant')
+            timePerIt['dynamic'][nblambdas-i-1,:,j] = np.lib.pad(junk['time_per_it'], (0,1000-junk['time_per_it'].size), 'constant')
+            timePerIt['dynamic_approx'][nblambdas-i-1,:,j] = np.lib.pad(junk1['time_per_it'], (0,1000-junk1['time_per_it'].size), 'constant')
+            timePerIt['dynamic_approx2'][nblambdas-i-1,:,j] = np.lib.pad(junk2['time_per_it'], (0,1000-junk2['time_per_it'].size), 'constant')
+            timePerIt['dynamic_approx3'][nblambdas-i-1,:,j] = np.lib.pad(junk3['time_per_it'], (0,1000-junk3['time_per_it'].size), 'constant')
+            
+        print "problem %d over %d"%(j+1,avg)           
+                 
+    print('Done') 
+
+
+    if 'ResSynthData' not in os.listdir('./'):
+        os.mkdir('ResSynthData')
+    np.savez('./ResSynthData/'+make_file_name(opt)+'_done.npz',\
+        timeRes=timeRes, nbIter=nbIter, opt=opt, xFinal = xFinal,\
+        nbFlops=nbFlops,sig=sig,RC=RC, timePerIt=timePerIt)
+    
+    ret = { 'timeRes' : timeRes, \
+            'nbIter': nbIter, \
+            'nbFlops': nbFlops, \
+            'timePerIt': timePerIt, \
+            'opt': opt }
+    return ret
+
+def traceLambdas_per_it(timePerIt, nbIter, opt): 
+    """
+    Colormap of the normalized time per iteration resulting from the experiment.
+    Compute it if not done.
+    """    
+    
+    mc = 0 # using only the first MC iteration, if more than one was performed
+    # Calculate reference value
+    time_it_noScreen = np.true_divide(timePerIt['noScreen'].sum(1),(timePerIt['noScreen']!=0).sum(1)).mean()
+    # Calculate max number of iterations
+    max_iter = int(nbIter['dynamic'].max())
+    max_iter = int(round(max_iter,-2)) # round to nearest hundred
+    # Normalizing and clipping data
+    time_d = (timePerIt['dynamic'][:,2:max_iter,mc].T/time_it_noScreen).clip(0,1)
+    time_d1 = (timePerIt['dynamic_approx'][:,:max_iter,mc].T/time_it_noScreen).clip(0,1)
+    time_d2 = (timePerIt['dynamic_approx2'][:,:max_iter,mc].T/time_it_noScreen).clip(0,1)
+    time_d3 = (timePerIt['dynamic_approx3'][:,:max_iter,mc].T/time_it_noScreen).clip(0,1)
+    
+    #pen_param_list = make_pen_param_list(opt['samp'])
+    pen_param_list = np.logspace(-2,0,num=opt['samp']) # TODO modified for log spacing between 10^{-2} and 10^{0}
+    # Defining display limits
+    extent=[np.log10(pen_param_list[0]),np.log10(pen_param_list[-1]),max_iter,1]
+    
+    # Figure
+    f , (GAP, AGAP) = plt.subplots(2,1,sharex=True, figsize=1.4*plt.figaspect(0.35))  
+    
+    # Colormap
+    cmap = 'OrRd' #'hot_r', 'inferno_r', 'binary', 'Spectral'
+    cmap_str = cmap
+    # White to Red
+    cmap = plt.cm.seismic(np.arange(plt.cm.seismic.N))
+    cmap = cmap[len(cmap)/2:,0:3]
+    #cmap[:,0:3] *= 0.6 # change luminosity
+    cmap = matplotlib.colors.ListedColormap(cmap)
+    cmap_str = 'wr'
+    
+    ######### PLOT DATA #########
+    GAP.imshow(time_d,extent=extent, cmap=cmap, aspect = 'auto') #aspect=1./1000,
+    im = AGAP.imshow(time_d2, extent=extent,cmap=cmap, aspect = 'auto') # aspect=1./1000,
+    #GAP.contourf(pen_param_list,np.arange(max_iter,0,-1),time_d,200, cmap=cmap), plt.xscale('log') # N=200 color levels
+    #im = AGAP.contourf(pen_param_list,np.arange(max_iter,0,-1),time_d2,200, cmap=cmap), plt.xscale('log') # N=200 color levels
+    f.colorbar(im, ax=[GAP,AGAP])
+    #############################
+    
+    # labels
+    GAP.set_ylabel("Iteration") # ,fontsize = 24)
+    AGAP.set_ylabel("Iteration") # ,fontsize = 24)
+    # log10(lambda/lambda_max)
+    plt.setp((GAP, AGAP), xticks=np.log10([0.01, 10**(-1.5), 0.1, 10**(-0.5), 1]), xticklabels=['-2','-1.5','-1','-0.5','0'])
+    AGAP.set_xlabel(r"$\log_{10}(\lambda/\lambda_{\mathrm{max}})$")
+    # lambda/lambda_max
+    #plt.setp((GAP, AGAP), xticks=np.log10(np.concatenate((np.linspace(0.01,0.1,10), np.linspace(0.2,1,9)))), xticklabels=['0.01','','','','','','','','','0.1','','','','','','','','','1'])
+    #AGAP.set_xlabel(r"$\lambda/\lambda_{\mathrm{max}}$")
+    
+    #GAP.set_yscale("log", nonposy='clip', basey=2)
+    GAP.set_ylim([max_iter,1])
+    matplotlib.rc('ytick', labelsize = 16)
+    
+    # Text
+    GAP.text(-0.4, max_iter*0.85, r'GAP', size=24) 
+    AGAP.text(-0.65, max_iter*0.85, r'A-GAP: $\|\mathbf{e}_j\| \!=\! 10^{-2}$', size=24) 
+    
+    f.suptitle(' Normalized running times per iteration',fontsize=26)
+    
+    f.savefig('./ResSynthData/PerIt_'+make_file_name(opt)+ '_Simu_relNoScreen_'+ cmap_str + '.pdf',bbox_inches = 'tight',bbox_pad = 2)

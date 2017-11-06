@@ -25,12 +25,13 @@ class Problem(object):
         self.D_bis = D_bis
         self.y = y
         self.pen_param = pen_param 
-        self.Gr = Gr 
+        self.Gr = Gr
         """
         Gr must contain list of tuples contining groups and associated weight 
         (group_index, (group, groupe_weight))
         (0,([...],1.))        
         """
+        self.normy2 = y.T.dot(y)
                 
     def objective(self, x, Screen):
         return self.loss(x, Screen) + self.pen_param * self.reg(x, Screen)
@@ -83,19 +84,23 @@ class Lasso(Problem):
         return star, lstar
         
         
-    def dualGap(self, x, Screen = None, dualpt = None, grad = None ):
+    def dualGap(self, x, Screen = None, dualpt = None, grad = None, feasDual = None ):
         if dualpt is None or grad is None:
             if Screen is None:
                 Screen = np.ones_like(x,dtype=np.int)
             app, dualpt, grad = self.gradient(x, Screen)
-            feasibility_coef  =  min(1, self.pen_param / LA.norm(grad , np.inf))
-            dualpt =  feasibility_coef * dualpt
-            grad =  feasibility_coef * grad
+            feasibility_coef  =  min(1, 1.0 / LA.norm(grad , np.inf)) # dual scaling
+            feasDual = feasibility_coef * dualpt
+
+#        dgap = float(self.loss(None,None,dualpt)  \
+#            + self.pen_param * self.reg(x,None) \
+#            + 0.5 * np.dot(dualpt.T,dualpt) \
+#            + dualpt.T.dot(self.y))
 
         dgap = float(self.loss(None,None,dualpt)  \
             + self.pen_param * self.reg(x,None) \
-            + 0.5 * np.dot(dualpt.T,dualpt) \
-            + dualpt.T.dot(self.y))
+            - 0.5 * self.normy2 \
+            + (0.5*self.pen_param**2) *np.dot(feasDual.T-self.y.T/self.pen_param,feasDual-self.y/self.pen_param) )
         
         return dgap            
         
