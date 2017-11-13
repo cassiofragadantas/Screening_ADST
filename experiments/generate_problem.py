@@ -10,7 +10,8 @@ import timeit
 
 from dynascreen.problem import Problem, Lasso, GroupLasso
 from dynascreen.dictionary import Dict
- 
+
+from mnist import MNIST
 
     
     
@@ -98,8 +99,19 @@ def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, D=None,
             L = np.random.randn(N,dict_params['n_rank'])
             R = np.random.randn(dict_params['n_rank'],K)
             D_lowrank = L.dot(R)
+            D = Dict(D_lowrank,opType="low-rank",params=dict(L=L,R=R))        
+        elif dict_type.startswith('MNIST'): # MNIST_(fast_dict_type). 
+                                            # E.g. 'MNIST_low-rank' or 'MNIST_sukro'
+            mndata = MNIST('./datasets/MNIST/LeCun/')
+            images_train,_ = mndata.load_training() #labels were ignored
+            images_test,_ =mndata.load_testing()
+            images_train = np.asarray(images_train).T
+            
+            # Fast approximation of data
+            if dict_type.endswith('low-rank'):
+                print()                
+                #TODO
                 
-            D = Dict(D_lowrank,opType="low-rank",params=dict(L=L,R=R))
                              
         D.normalize()
     

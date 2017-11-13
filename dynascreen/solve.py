@@ -142,7 +142,7 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
     if EmbedTest=='static':
         app, dualpt ,grad = problem.gradient(Algo.x, Screen)
         if warm_start is None:
-            Screen.Initialisation(problem, grad = grad, lasso = problem.pen_param)
+            Screen.Initialisation(problem, scalProd = grad, lasso = problem.pen_param)
         else:
             Screen.Initialisation(problem,  lasso = problem.pen_param)
         
@@ -174,7 +174,7 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
         # dynamic screening
         if EmbedTest=='dynamic':               
             if Screen.init==0: # at the first iteration need to compute the test vector
-                if warm_start == None:
+                if warm_start is None:
                     if Algo.__class__.__name__ == 'Chambolle-Pock':
                         Screen.Initialisation(problem, \
                             -Algo.grad*(1+Algo.stepsigma)/Algo.stepsigma)                    
@@ -187,11 +187,7 @@ def solver(y=None, D=None, lasso=None, Gr=[], problem=None, stop = dict(),
                     else:
                         Screen.Initialisation(problem, lasso = problem.pen_param)
                     
-                Screen.SetScreen()    
-                
-            else: # compute only the new radius
-                Screen.RefineR(Algo.dualpt,Algo.grad,Algo.x)
-                
+            Screen.RefineR(Algo.dualpt,Algo.grad,Algo.x)
             # screen with the new test
             Screen.SetScreen()                 
             Rate = Screen.GetRate()
@@ -440,7 +436,7 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
         # dynamic screening
         if EmbedTest=='dynamic':               
             if Screen.init==0: # at the first iteration need to compute the test vector
-                if warm_start == None:
+                if warm_start is None:
                     if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
                         Screen.Initialisation(problem, \
                             -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma)                    
@@ -455,12 +451,21 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
                         Screen.Initialisation(problem)                    
                     else:
                         Screen.Initialisation(problem, lasso = problem.pen_param, normE = normE, norm2E = norm2E)
-                    
-                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
-                
-            else: # compute only the new radius
-                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
-                
+
+                # OPTION 2 - handling warm start
+#                # Using original atoms for the term |d^T c|. Internal procuct needs to be computed anyway
+#                scalProd = problem.D_bis.ApplyTranspose(problem.y) #TODO: GAP doesn't use it
+#                # Using atoms from the approximate dictionary. Can be taken from the algorithm iteration in case of no warm_start
+##                scalProd = None
+##                if warm_start is None:
+##                    if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+##                        scalProd = -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma
+##                    else:
+##                        scalProd = -Algo_approx.grad
+#                Screen.Initialisation(problem, scalProd, \
+#                                              lasso=problem.pen_param, normE = normE, norm2E = norm2E)
+
+            Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
             # screen with the new test
             Screen.SetScreen()
             Rate_old = Rate         # the swtiching criterion need the previous rate
@@ -520,7 +525,7 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
         # dynamic screening
         if EmbedTest=='dynamic':
             if Screen.init==0: # at the first iteration need to compute the test vector
-                if warm_start == None:
+                if warm_start is None:
                     if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
                         Screen.Initialisation(problem, \
                             -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma)                    
@@ -680,7 +685,7 @@ class OptimAlgo(object):
             
 
         self.dgap = np.inf
-        if warm_start == None:
+        if warm_start is None:
             self.x = np.zeros((K,1),dtype=np.float,order='F')    
         else:
             assert warm_start.shape[0] == K
@@ -720,6 +725,12 @@ class OptimAlgo(object):
             if np.size(self.lastDgaps) > self.prevIter:
                 self.lastDgaps.pop(0)
 
+            # dgap_rel_tol
+            if  self.itCount>1 and \
+                (max(self.lastDgaps) - min(self.lastDgaps))/(self.lastDgaps[-1] + 1e-10) < self.stopParams['dgap_rel_tol']:
+                self.stopCrit += 'Dgap_Tol'+ str(self.stopParams['dgap_rel_tol'])
+
+
         self.lastErrs.append(self.loss+self.lasso*self.reg)
         # not able to take the difference when less than two 
         # elements have been computed        
@@ -730,9 +741,6 @@ class OptimAlgo(object):
 
         if abs(self.dgap) < self.stopParams['dgap_tol']:
             self.stopCrit += 'dual_gap' + str(self.stopParams['dgap_tol'])
-        
-        if (max(self.lastDgaps) - min(self.lastDgaps))/(self.lastDgaps[-1] + 1e-10) < self.stopParams['dgap_rel_tol']:
-            self.stopCrit += 'Dgap_Tol'+ str(self.stopParams['dgap_rel_tol'])
 
         if self.lastErrs[-1] < self.stopParams['abs_tol']:
             self.stopCrit += 'Abs_Tol'+ str(self.stopParams['abs_tol'])
@@ -1014,7 +1022,7 @@ class ScreenTest:
         
                 
     
-    def Initialisation(self,problem, grad=[], lasso=None):
+    def Initialisation(self,problem, scalProd=[], lasso=None):
         """
         Initialize all fields of the instance acoording to the given parameters
         
@@ -1029,8 +1037,8 @@ class ScreenTest:
         lasso : double
             Lasso hyperparameter, controling sparsity of the solution
         
-        grad : nd array (optional)
-            if the grad is given it is not recomputed in the initialization        
+        scalProd : nd array (optional)
+            if the (D^T y) is given it is not recomputed in the initialization
         
         """
         if lasso is None:            
@@ -1039,10 +1047,10 @@ class ScreenTest:
             self.lasso = lasso
         self.problem = problem
         if not 'scalProd' in dir(self): 
-            if grad==[]:        
+            if scalProd==[]:
                 self.scalProd = problem.D.ApplyTranspose(problem.y)
             else:
-                self.scalProd = grad
+                self.scalProd = scalProd
 
         if problem.__class__.__name__ == 'Lasso':    
             
@@ -1192,7 +1200,7 @@ class ScreenTestApprox:
         
                 
     
-    def Initialisation(self,problem, grad=[], lasso=None, normE=np.zeros(1), norm2E=0):
+    def Initialisation(self,problem, scalProd=[], lasso=None, normE=np.zeros(1), norm2E=0):
         """
         Initialize all fields of the instance acoording to the given parameters
         
@@ -1207,8 +1215,8 @@ class ScreenTestApprox:
         lasso : double
             Lasso hyperparameter, controling sparsity of the solution
         
-        grad : nd array (optional)
-            if the grad is given it is not recomputed in the initialization        
+        scalProd : nd array (optional)
+            if (D^T y) is given it is not recomputed in the initialization
         
         """
         if lasso is None:            
@@ -1219,10 +1227,10 @@ class ScreenTestApprox:
         if not 'scalProd' in dir(self):
             #if self.TestType in {"GAP","GAP_approx"}: #TODO the product (X^T y) is not necessary
             #    self.scalProd = np.zeros(1)
-            if grad==[]:        
+            if scalProd==[]:
                 self.scalProd = problem.D.ApplyTranspose(problem.y)
             else:
-                self.scalProd = grad
+                self.scalProd = scalProd
             
         self.normE = normE
         self.norm2E2 = norm2E**2

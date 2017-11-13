@@ -51,7 +51,7 @@ def second(opt=dict(), **keywords):
     res = runLambdas(opt=expe)
     traceLambdas(res['timeRes'], res['nbIter'], res['nbFlops'] ,expe )
 
-def first_sukro(opt =dict(), **keywords):
+def first_sukro(opt =dict(), **keywords): #expe 6
     '''
     Plot one execution of the dynamic screening for given options
     
@@ -87,7 +87,7 @@ def second_sukro(opt=dict(), **keywords):
     np.random.seed(0)
     default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
                     dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=100,\
-                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default')
+                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default') #, wstart=True)
     #default = dict(dict_type = 'low-rank',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
     #                dict_params = dict(n_rank = 200),nbRuns=100,switching='default')
     expe = mergeopt(opt, default, keywords)
@@ -103,7 +103,7 @@ def second_sukro_per_it(opt=dict(), **keywords):
     #np.random.seed(0)
     default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
                     dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=1,\
-                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default', samp=100)
+                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default', samp=100) #,  wstart=True)
     #default = dict(dict_type = 'low-rank',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "ST1",\
     #                dict_params = dict(n_rank = 200),nbRuns=100,switching='default')
     expe = mergeopt(opt, default, keywords)
@@ -203,7 +203,8 @@ def expeScrRate(opt={},**keywords):
     problem, opt = GP.generate(opt) # Generate the problem
     
     # Evaluate RC (Relative Complexity)
-    if opt['dict_type']  in {'sukro','low-rank'}:
+    #if opt['dict_type']  in {'sukro','low-rank'}:
+    if False:
         total_it = 100
         RC = estimateRC(problem.D,opt,total_it,verbose=True)
     else: # otherwise we just assume RC = 0.5
