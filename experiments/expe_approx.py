@@ -135,7 +135,7 @@ def estimateRC(D,opt,total_it=1000, verbose=False):
     screen = np.ones(opt['K'],dtype=np.int)
     D_dense = Dict(np.random.randn(opt['N'],opt['K']))
     for k in range(total_it):
-        p = float(k)/total_it
+        p = float(k+1)/total_it
         
         x = np.zeros((opt['K'],1))
         nz = max(int(p*opt['K']),1) # not really bernoulli because the number of active features is deterministic here.
@@ -732,7 +732,8 @@ def runLambdas(opt={},**keywords):
         
     pen_param_list = make_pen_param_list(opt['samp'])
     #### run the algorithm if needed
-    if (not opt['recalc']) and (make_file_name(opt)+'_done.npz') in os.listdir('./ResSynthData'):
+    if 'ResSynthData' in os.listdir('./') and \
+       (not opt['recalc']) and (make_file_name(opt)+'_done.npz') in os.listdir('./ResSynthData'):
         print 'experiment already computed'        
         Data = np.load('./ResSynthData/'+make_file_name(opt)+'_done.npz' )
         if 'time' in Data.keys():
@@ -853,7 +854,8 @@ def runLambdas_per_it(opt={},**keywords): #TODO merge with runLambdas
     #pen_param_list = make_pen_param_list(opt['samp'])
     pen_param_list = np.logspace(-2,0,num=opt['samp']) # TODO modified for log spacing between 10^{-2} and 10^{0}
     #### run the algorithm if needed
-    if (not opt['recalc']) and (make_file_name(opt)+'_done.npz') in os.listdir('./ResSynthData'):
+    if  'ResSynthData' in os.listdir('./') and \
+        (not opt['recalc']) and (make_file_name(opt)+'_done.npz') in os.listdir('./ResSynthData'):
         print 'experiment already computed'        
         Data = np.load('./ResSynthData/'+make_file_name(opt)+'_done.npz' )
         if 'time' in Data.keys():
