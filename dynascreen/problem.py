@@ -56,8 +56,8 @@ class Problem(object):
     
 
 class Lasso(Problem):
-    def __init__(self, D, y, pen_param = None):
-        super(Lasso,self).__init__(D, y, [], pen_param)   
+    def __init__(self, D, y, pen_param = None, D_bis = None):
+        super(Lasso,self).__init__(D, y, [], pen_param,D_bis)   
     
     def loss(self, x, Screen, res=None):
         if res is None:
@@ -89,13 +89,9 @@ class Lasso(Problem):
             if Screen is None:
                 Screen = np.ones_like(x,dtype=np.int)
             app, dualpt, grad = self.gradient(x, Screen)
-            feasibility_coef  =  min(1, 1.0 / LA.norm(grad , np.inf)) # dual scaling
+            #feasibility_coef  =  min(1, 1.0 / LA.norm(grad , np.inf)) # dual scaling
+            feasibility_coef = min(1, 1.0 / LA.norm(grad , np.inf)) if LA.norm(grad , np.inf) else 1 # dual scaling - avoiding division by 0
             feasDual = feasibility_coef * dualpt
-
-#        dgap = float(self.loss(None,None,dualpt)  \
-#            + self.pen_param * self.reg(x,None) \
-#            + 0.5 * np.dot(dualpt.T,dualpt) \
-#            + dualpt.T.dot(self.y))
 
         dgap = float(self.loss(None,None,dualpt)  \
             + self.pen_param * self.reg(x,None) \

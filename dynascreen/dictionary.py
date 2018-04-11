@@ -92,8 +92,9 @@ class Dict:
             for r in range(self.nkron):
                 y2 = y2 + self.B[:,:,r].dot(X.dot(self.A[:,:,r].T))
             return np.reshape(y2,[self.N2*self.N1,1], order='F')
-        elif self.opType=="low-rank": # Screening is not used
-            return self.L.dot(self.R.dot(vector))
+        elif self.opType=="low-rank":
+            return self.L.dot(fprod.BlasCalcDx(self.R,vector,screen)) # Using screening
+            
     
     def ApplyTranspose(self,vector):
         if self.opType=="matrix":
@@ -129,8 +130,8 @@ class Dict:
             for r in range(self.nkron):
                 y2 = y2 + self.B[:,:,r].T.dot(X.dot(self.A[:,:,r]))
             return np.reshape(y2,[self.K2*self.K1,1], order='F')/self.normcoef[:,None]
-        elif self.opType=="low-rank": # Screening is not used
-            return self.R.T.dot(self.L.T.dot(vector))
+        elif self.opType=="low-rank":
+            return fprod.BlasCalcDty(self.R.T,self.L.T.dot(vector),screen) # Using screening
             
     ######################################################
             

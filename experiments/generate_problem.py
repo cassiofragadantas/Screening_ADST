@@ -10,12 +10,9 @@ import timeit
 
 from dynascreen.problem import Problem, Lasso, GroupLasso
 from dynascreen.dictionary import Dict
-
-from mnist import MNIST
-
     
     
-def generate(opt, D=None,y=None):
+def generate(opt, D=None,y=None,D_bis=None):
     '''
     Generate the problem corresponding to the options given in opt
     
@@ -33,10 +30,11 @@ def generate(opt, D=None,y=None):
         if 'dict_params' not in opt.keys():
             opt['dict_params']=None
 
-        D, y = noise(opt['N'],opt['K'], dict_type=opt['dict_type'], data_type=opt['data_type'],\
-                     dict_params=opt['dict_params'], D=D,y=y)
+        D, y, D_bis  = noise(opt['N'],opt['K'], dict_type=opt['dict_type'], data_type=opt['data_type'],\
+                            dict_params=opt['dict_params'], data_params=opt['data_params'],  
+                            D=D,y=y,D_bis=D_bis)
         
-        prob = Lasso(D, y)
+        prob = Lasso(D, y, D_bis=D_bis)        
         star,lstar = prob.getStar() 
         prob.pen_param = opt['lasso']*lstar
         
@@ -58,7 +56,7 @@ def generate(opt, D=None,y=None):
     return prob, opt
 
 
-def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, D=None,y=None):
+def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, data_params={},D=None,y=None,D_bis=None):
     '''
     Generate a dictionary and signal where the signal and all atoms follow the
     same distribution gaussians noise or pnoise.
@@ -82,8 +80,6 @@ def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, D=None,
         if dict_type=='pnoise':
             D = Dict(np.eye(N,1)+0.01*np.tile(np.random.rand(1,K),\
                     (N,1))*np.random.randn(N,K)) 
-        elif dict_type=='gnoise':
-            D = Dict(np.random.randn(N,K))
         elif dict_type=='sukro':
             D_sukro = np.zeros([N,K])
             # Separable Factors
@@ -95,60 +91,42 @@ def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, D=None,
             D = Dict(D_sukro,opType="sukro",params=dict(A=A,B=B))
         elif dict_type=='low-rank':
             D_lowrank = np.zeros([N,K])
+            # If rank is not provided
+            if not dict_params.has_key('n_rank'):
+                dict_params['n_rank'] = min(N,K)/10 + 1
             # Low-rank Factors
             L = np.random.randn(N,dict_params['n_rank'])
             R = np.random.randn(dict_params['n_rank'],K)
             D_lowrank = L.dot(R)
-            D = Dict(D_lowrank,opType="low-rank",params=dict(L=L,R=R))        
-        elif dict_type.startswith('MNIST'): # MNIST_(fast_dict_type). 
-                                            # E.g. 'MNIST_low-rank' or 'MNIST_sukro'
-            mndata = MNIST('./datasets/MNIST/LeCun/')
-            images_train,_ = mndata.load_training() #labels were ignored
-            images_test,_ =mndata.load_testing()
-            images_train = np.asarray(images_train).T
-            
-            # Fast approximation of data
-            if dict_type.endswith('low-rank'):
-                print()                
-                #TODO
-                
+            D = Dict(D_lowrank,opType="low-rank",params=dict(L=L,R=R))
+        else: #elif dict_type=='gnoise':
+            # Gaussian dictionary is default
+            D = Dict(np.random.randn(N,K))
                              
         D.normalize()
-    
-    # BEFORE data_type
-#    if dict_type=='pnoise':
-#        y = np.eye(N,1)+0.01*np.tile(np.random.rand(1,1),\
-#                (N,1))*np.random.randn(N,1)
-#    elif dict_type=='gnoise':
-##        y = np.random.randn(N,1)
-#        #TODO teste, bernoulli (not really) gaussian
-#        nz = int(0.02*K)
-#        beta = np.zeros((K,1))
-#        idx = K*np.random.rand(1,nz)
-#        beta[idx.astype(int)] = np.random.randn(nz,1)
-#        y = D.data.dot(beta)
-#    elif dict_type=='sukro':
-#        y = np.random.randn(N,1)        
-    
-    if not y:    
+
+    if y is None:    
         if data_type=='pnoise':
             y = np.eye(N,1)+0.01*np.tile(np.random.rand(1,1),\
                     (N,1))*np.random.randn(N,1)
-        elif data_type=='gnoise':
-            y = np.random.randn(N,1)
         elif data_type=="bernoulli-gaussian":
             #Bernoulli (not really) gaussian active features generanting 'y'
-            p = 0.02
+            if data_params.has_key('p'):
+                p = data_params['p']
+            else: # default value
+                p = 0.02
             nz = int(p*K) # not really bernoulli because the number of active features is deterministic here.
             beta = np.zeros((K,1))
             idx = K*np.random.rand(1,nz)
             beta[idx.astype(int)] = np.random.randn(nz,1)
             y = D.data.dot(beta)        
-        
+        else: #if data_type=='gnoise':
+            # Gaussian vector is default            
+            y = np.random.randn(N,1)        
     
-    y /= np.linalg.norm(y)
+        y /= np.linalg.norm(y)
     
-    return D,y
+    return D,y,D_bis
  
 
      
