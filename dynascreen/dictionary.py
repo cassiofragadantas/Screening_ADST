@@ -29,13 +29,11 @@ class Dict:
         self.normcoef=normcoef
         self.opType=opType
         
-        if opType=="matrix":
-            self.shape = self.data.shape
-            if not self.normalized:
-                self.normalize()
-        # Initializing sukro dictionary
-        elif opType=="sukro":
-            self.shape = self.data.shape
+        self.shape = self.data.shape
+        if not self.normalized:
+            self.normalize()
+
+        if opType=="sukro":
             # Submatrices - provided via input 'params'
             #TODO assert that A and B are provided in 'params'
             self.A = params['A']
@@ -46,19 +44,21 @@ class Dict:
             self.K1 = self.A.shape[1]
             self.K2 = self.B.shape[1]
             self.nkron = self.A.shape[2]
-            if not self.normalized:
-                self.normalize()
-        elif opType=="low-rank":
-            self.shape = self.data.shape            
-            if not self.normalized:
-                self.normalize()            
+        elif opType=="low-rank":  
             # L and R matrices(such that D = L*R) provided via input 'params'
             #TODO test if L and R are provided. If not, do the SVD.
             self.L = params['L']
             self.R = params['R']/ self.normcoef[None,:] # Normalize R
-            # Submatrices sizes
             self.nrank = self.L.shape[1]
-
+        elif opType=="faust":
+            #TODO assert that params contains a FAuST object
+            self.faust = params # TODO add normcoef inside faust and remove it from the Apply methods
+#            self.faust = []
+#            for faust_k in params:
+#                self.faust.append(faust_k)
+#            self.napprox = 0
+        elif not opType=="matrix":
+            raise ValueError('Not valid dictionary type')
 
     def Apply(self,vector):
         if self.opType=="matrix":
@@ -75,6 +75,10 @@ class Dict:
             return np.reshape(y2,[self.N2*self.N1,1], order='F')
         elif self.opType=="low-rank":
             return self.L.dot(self.R.dot(vector))
+        elif self.opType=="faust":
+            # vector_normalized =  vector/self.normcoef[:,None]
+            return self.faust*(vector/self.normcoef[:,None])
+#            return self.faust*vector # without normalizing
                 
     def ApplyScreen(self,vector,screen):
         """
@@ -94,7 +98,10 @@ class Dict:
             return np.reshape(y2,[self.N2*self.N1,1], order='F')
         elif self.opType=="low-rank":
             return self.L.dot(fprod.BlasCalcDx(self.R,vector,screen)) # Using screening
-            
+        elif self.opType=="faust":
+            # vector_normalized =  vector/self.normcoef[:,None]
+            return self.faust*(vector/self.normcoef[:,None])
+#            return self.faust*vector # without normalizing
     
     def ApplyTranspose(self,vector):
         if self.opType=="matrix":
@@ -113,6 +120,9 @@ class Dict:
             return np.reshape(y2,[self.K2*self.K1,1], order='F')/self.normcoef[:,None]
         elif self.opType=="low-rank": # Screening is not used
             return self.R.T.dot(self.L.T.dot(vector))
+        elif self.opType=="faust":
+            return (self.faust.transpose()*vector)/self.normcoef[:,None]
+#            return self.faust.transpose()*vector # without normalizing
             
     def ApplyTransposeScreen(self,vector,screen):
         """
@@ -132,6 +142,9 @@ class Dict:
             return np.reshape(y2,[self.K2*self.K1,1], order='F')/self.normcoef[:,None]
         elif self.opType=="low-rank":
             return fprod.BlasCalcDty(self.R.T,self.L.T.dot(vector),screen) # Using screening
+        elif self.opType=="faust":
+            return (self.faust.transpose()*vector)/self.normcoef[:,None]
+#            return self.faust.transpose()*vector # without normalizing
             
     ######################################################
             
@@ -140,7 +153,7 @@ class Dict:
         normalize the dictionnary in row (dim=1) or in column (dim=0)
         """
         
-        if (self.opType == "matrix" or self.opType == "sukro" or self.opType == 'low-rank') and self.normcoef == []:
+        if (self.opType == "matrix" or self.opType == "sukro" or self.opType == 'low-rank' or self.opType == "faust") and self.normcoef == []:
             if self.data.dtype!=np.float and self.data.dtype!=np.complex:
                 self.data = self.data.astype(np.float,copy=False)
             (row,col) = self.data.shape

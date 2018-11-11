@@ -7,6 +7,7 @@ Created on Mon May 13 16:23:04 2013
 import numpy as np
 from numpy import linalg as la
 import timeit
+import os
 
 from dynascreen.problem import Problem, Lasso, GroupLasso
 from dynascreen.dictionary import Dict
@@ -85,10 +86,71 @@ def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, data_pa
             # Separable Factors
             A = np.random.randn(dict_params['N1'],dict_params['K1'],dict_params['n_kron'])
             B = np.random.randn(dict_params['N2'],dict_params['K2'],dict_params['n_kron'])
+
+            if dict_params.has_key('svd_decay') and dict_params['svd_decay'] is 'exponential':
+                #svd_decay = np.exp(range(0,-dict_params['n_kron'],-1))
+                svd_decay = np.exp(-np.linspace(0,9,dict_params['n_kron']))
+            else:
+                svd_decay = np.ones(dict_params['n_kron'])
+            
             for k_rank in range(dict_params['n_kron']):
+                A[:,:,k_rank] *= svd_decay[k_rank]
                 D_sukro = D_sukro + np.kron(A[:,:,k_rank],B[:,:,k_rank])
                 
             D = Dict(D_sukro,opType="sukro",params=dict(A=A,B=B))
+        elif dict_type=='sukro_approx': # D is well approximated by SuKro. D_bis is a SuKro dictionary with the maximum n_kron
+            D_sukro = np.zeros([N,K])
+            if dict_params.has_key('nkron_max'):
+                nkron_max = dict_params['nkron_max']
+            else:
+                nkron_max = max(dict_params['n_kron'])
+
+            # SVD decay
+            if dict_params.has_key('svd_decay') and dict_params['svd_decay'] is 'exponential':
+                if dict_params.has_key('svd_decay_const'):
+                    decay_const = dict_params['svd_decay_const']
+                else:
+                    decay_const = 0.5 #8.5/19 gives round normE for n_kron = {5, 10, 20}
+                    
+                svd_decay = np.exp(-decay_const*np.linspace(0,N-1,N))
+            else:
+                svd_decay = np.ones(nkron_max+1)
+            
+            decay_tol = 1e-7
+            # Separable Factors
+            if ('reuse' in dict_params):
+                filename =  './ResSynthData/'+dict_type+'-dict_'+data_type+'-data_N'+str(N)+'_K'+str(K)+'.npz'
+                if os.path.isfile(filename): # Load previously generate factors
+                    Data = np.load(filename)
+                    A = Data['A'][()]
+                    B = Data['B'][()]
+                else:
+                    A = np.random.randn(dict_params['N1'],dict_params['K1'],max(nkron_max+1,sum(svd_decay>decay_tol)))
+                    B = np.random.randn(dict_params['N2'],dict_params['K2'],max(nkron_max+1,sum(svd_decay>decay_tol)))
+                    np.savez(filename,A=A,B=B)
+            else:
+                A = np.random.randn(dict_params['N1'],dict_params['K1'],max(nkron_max+1,sum(svd_decay>decay_tol)))
+                B = np.random.randn(dict_params['N2'],dict_params['K2'],max(nkron_max+1,sum(svd_decay>decay_tol)))
+            
+            # Building dictionary
+            # structured part (until the biggest chosen n_kron, plus one term)
+            for k_rank in range(nkron_max+1):
+                A[:,:,k_rank] *= svd_decay[k_rank]
+                D_sukro = D_sukro + np.kron(A[:,:,k_rank],B[:,:,k_rank])
+
+            D_bis = Dict(D_sukro,opType="sukro",params=dict(A=A[:,:,range(nkron_max)],B=B[:,:,range(nkron_max)]))            
+            
+            # rest
+            # Ideally, we should go until k_rank < N, but this is too slow
+            # Therefore, we keep going at least until the singular value is smaller than decay_tol
+            for k_rank in range(nkron_max+1,sum(svd_decay>decay_tol)):
+                A[:,:,k_rank] *= svd_decay[k_rank]
+                D_sukro = D_sukro + np.kron(A[:,:,k_rank],B[:,:,k_rank])
+            
+            #D = Dict(D_sukro) # Normalize columns
+            #D_sukro = D.data + 1e-3*np.sqrt(1./N)*np.random.randn(N,K) # Add noise
+                
+            D = Dict(D_sukro)
         elif dict_type=='low-rank':
             D_lowrank = np.zeros([N,K])
             # If rank is not provided

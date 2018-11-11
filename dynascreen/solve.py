@@ -249,14 +249,28 @@ def flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC=1,switch_it=0):
                     6*(1-np.asarray(screenrate).mean()) + 5*N + 5*nb_gr) * nbit
                     #6*K + 5*N + 5*nb_gr) * nbit
                     
-        else:
-            flops = ( N*K*RC*(1 + 1 - #N*K*(RC + 1 - #TODO verify which is right 
-                        np.asarray(zeros[0:switch_it]).mean()/K) + \
-                        7*(1-np.asarray(screenrate[0:switch_it]).mean()) + 5*N + 5*nb_gr)* switch_it + \
-                    ( N*K*(2 - np.asarray(screenrate[switch_it:]).mean() -
-                        np.asarray(zeros[switch_it:]).mean()/K) + \
-                        6*(1-np.asarray(screenrate[switch_it:]).mean()) + 5*N + 5*nb_gr)* (nbit - switch_it) + N*K
+        else: 
+            # RC and switch_it are lists of same size
+            if not isinstance(RC,list):
+                RC = [RC]
+            if not isinstance(switch_it,list):
+                switch_it = [switch_it]
+                
+            # Final iterations: original dictionary
+            flops = ( N*K*(2 - np.asarray(screenrate[switch_it[-1]:]).mean() -
+                        np.asarray(zeros[switch_it[-1]:]).mean()/K) + \
+                        6*(1-np.asarray(screenrate[switch_it[-1]:]).mean()) + 5*N + 5*nb_gr)* (nbit - switch_it[-1]) + N*K
                         #6*K + 5*N + 5*nb_gr) * (nbit - switch_it)
+                        
+            # Iterations with approximate dictionaries
+            switch_it = [0] + switch_it
+            for k in range(len(RC)):
+                #N*K*(RC[k] + 1 - #TODO verify which is right
+                if switch_it[k+1] > switch_it[k]:
+                    flops += ( N*K*RC[k]*(1 + 1 - 
+                              np.asarray(zeros[switch_it[k]:switch_it[k+1]]).mean()/K) + \
+                              7*(1-np.asarray(screenrate[switch_it[k]:switch_it[k+1]]).mean()) + 5*N + 5*nb_gr)* (switch_it[k+1] - switch_it[k])                      
+
     elif EmbedTest == 'static':
         flops = ( N*K*(2 - np.asarray(zeros).mean()/K - 
             np.asarray(screenrate).mean() ) + 4*K + N + 3*nb_gr) \
@@ -272,21 +286,19 @@ def flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC=1,switch_it=0):
 ###    General Solver for Lasso and Group-Lasso
 ##############################################
 
- 
 def switching_criterion(N, K, RC=1, Rate=0, Rate_old=0, Rate_est=0):
     # RC criterion
     crit_RC = (1-Rate_est < RC*float(N)/(N-1))  # complexity gain of approximate dicitonary doesn't pay off
 #    crit_RC = (1-Rate < RC*float(N)/(N-1))  # complexity gain of approximate dicitonary doesn't pay off
     
     # Screening saturation criterion
-    crit_Rate = False
 #        crit_Rate = (Rate == Rate_old) and (Rate != 0) # Screening has saturated  
     
-    return (crit_RC or crit_Rate)
+    return crit_RC
 
 def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None, Gr=[], problem=None, stop = dict(), switching = '',
                L='backtracking',scr_type="Dome",EmbedTest='dynamic',mon=False, 
-               algo_type ='FISTA', warm_start = None, verbose=0):
+               algo_type ='FISTA', warm_start = None, verbose=0, switching_gamma=2e-1):
     """
     This function solve the Lasso and Group-Lasso problems for a dictionary D,
     an observation y and a regularization parameter :math:`\lambda`
@@ -346,7 +358,10 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
         
     warm_start : array_like
         Specify the initial value a x
-        
+
+    switching_gamma : parameter that controls the convergence-based switching
+        criterion. The closest to zero switching_gamma is, the longer the 
+        approximate dictionary is kept.        
     
     Returns
     ---------
@@ -391,15 +406,22 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
 
     # Convergence switching criterion
     stop_approx = stop.copy()
-    if switching is not 'screening_only': # No convergence criterion for switching
+#    if switching is not 'screening_only': # No convergence criterion for switching
+    if switching not in {'screening_only','off'}: # No convergence criterion for switching
         if ('dgap_tol' in  stop.keys()) or ('dgap_rel_tol'  in  stop.keys()):
+            # gap ratio - switching criterion
+            stop_approx["dgap_ratio"] = switching_gamma # 2e-1 gives very close results to stop_approx["dgap_rel_tol"] = 5e-3. 5e-2 seems to give better results for MEG
             # gap relative variation - switching criterion
-            stop_approx["dgap_rel_tol"] = 5e-3
+#            stop_approx["dgap_rel_tol"] = 5e-3
             # gap absolute variation - switching criterion
 #            stop_approx["dgap_tol"] = np.mean(normE)
 #            stop_approx["dgap_tol"] = 1e-1*np.mean(normE); print "MODIF! stop_approx" # Never switches
-        else:
+        elif 'rel_tol' in  stop.keys():
             stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(np.mean(normE)**2)
+        elif 'conv_speed' in  stop.keys():
+            stop_approx["conv_speed"] = np.mean(normE)**2 # not calibrated by experiments
+        else:
+            raise NotImplementedError('Convergence-based switching criterion not defined for this particular convergence criterion')
 
     checkpoint1, checkpoint2, checkpoint3 = list(),list(),list() # DEBUG TIME
     checkpoint4, checkpoint5, checkpoint6 = list(),list(),list() # DEBUG TIME
@@ -429,7 +451,8 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
         screenmon = np.array(Screen.screen[np.newaxis].T)
     
     ## Enter the Loop of approximate problem (before switching)
-    while not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit:
+#    while not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit:
+    while (not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) or switching=='off' ) and not Algo_approx.stopCrit:
         checkpoint1.append(time.time()) # DEBUG TIME
         #####    One Iteration step    #############
         Algo_approx.Iterate(Screen)
@@ -491,6 +514,355 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
     elif 'dgap_tol' in  stop.keys():
         Algo_approx.stopParams["dgap_tol"] = stop["dgap_tol"]
         Algo_approx.stopParams["dgap_rel_tol"] = -np.inf
+    elif 'rel_tol' in  stop.keys():
+        Algo_approx.stopParams["rel_tol"] = stop["rel_tol"]
+    elif 'conv_speed' in  stop.keys():
+        Algo_approx.stopParams["conv_speed"] = stop["conv_speed"]
+    elif 'max_iter' in  stop.keys():
+        Algo_approx.stopParams["max_iter"] = stop["max_iter"]
+    else:
+        raise NotImplementedError('Convergence-based switching criterion not defined for this particular convergence criterion')
+        
+    problem.D, problem.D_bis = problem.D_bis, problem.D
+    #Algo_approx.D = problem.D
+    
+    duration2 = time.time() - startTime  - duration1 #DEBUG TIME
+    # Avoiding complexity peak at switching point
+    # screen_est is used on the first iteration instead of screen - Not safe!
+#    screenrate[-1] = Rate_est
+#    rayons[-1] = Screen.newR_est
+#    Screen.screen, Screen.screen_est = Screen.screen_est, Screen.screen
+
+
+    while not Algo_approx.stopCrit:
+        checkpoint5.append(time.time()) # DEBUG TIME
+        #####    One Iteration step    #############
+        Algo_approx.Iterate(Screen)
+        checkpoint6.append(time.time()) # DEBUG TIME
+        
+        #####    Dynamic Screening    ##############
+        # dynamic screening
+        if EmbedTest=='dynamic':
+            if Screen.init==0: # at the first iteration need to compute the test vector
+                if warm_start is None:
+                    if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+                        Screen.Initialisation(problem, \
+                            -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma)                    
+                    else:
+                        Screen.Initialisation(problem, -Algo_approx.grad,
+                                              lasso=problem.pen_param)
+                else:
+                    if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+                        Screen.Initialisation(problem)                    
+                    else:
+                        Screen.Initialisation(problem, lasso = problem.pen_param)
+
+            Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
+            # screen with the new test
+            Screen.SetScreen()                 
+            Rate = Screen.GetRate()
+
+        checkpoint7.append(time.time()) # DEBUG TIME                                
+        Algo_approx.itCount += 1 
+        Algo_approx.StopCrit(Screen,EmbedTest)      
+        
+        rayons.append(Screen.newR)
+        objective.append(Algo_approx.lastErrs[-1])
+        screenrate.append(Rate)
+        screenrate_est.append(Rate)
+        zeros.append( K - np.count_nonzero(Algo_approx.x))
+        dGaps.append(Algo_approx.dgap)
+        dGaps_est.append(Algo_approx.dgap_est)
+        
+        if mon: # monitoring data
+            screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
+            xmon = np.append(xmon,Algo_approx.x,axis=1)
+        checkpoint8.append(time.time()) # DEBUG TIME
+    
+    duration3 = time.time() - startTime  - duration2 - duration1 #DEBUG TIME
+    duration = time.time() - startTime
+    time_per_it = np.append(time_per_it, checkpoint8 - np.append(checkpoint4[-1],checkpoint8[:-1]))
+
+    if not(mon):
+        monvar = dict()
+    else:
+        monvar={'xmon':         xmon,
+                'screenmon':    screenmon}
+ 
+#    print "DURATION1: approx dict loop  %.3f ms in %d iterations"%(duration1*1000, switch_it) #DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint2,checkpoint1)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint3,checkpoint2)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint4,checkpoint3)])
+#    print "DURATION2  %.3f ms"%(duration2*1000) #DEBUG TIME
+#    print "DURATION3  %.3f ms in %d iterations"%(duration3*1000,Algo_approx.itCount-switch_it) #DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint6,checkpoint5)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint7,checkpoint6)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint8,checkpoint7)])
+#    print ""    
+    
+    if verbose >=1:
+        print "solved in %d"%(Algo_approx.itCount)
+        
+    Result =   {'sol':              Algo_approx.x,
+                'eval':             objective[-1],
+                'objective':        np.asarray(objective).flatten(),
+                'radius':           np.asarray(rayons),
+                'screenrate':       np.asarray(screenrate, dtype=float),
+                'screenrate_est':   np.asarray(screenrate_est, dtype=float),
+                'zeros':            np.asarray(zeros, dtype=float),
+                'dGaps':            np.asarray(dGaps, dtype=float),
+                'dGaps_est':        np.asarray(dGaps_est, dtype=float),
+                'time':             duration,
+                'time1':            duration1, #DEBUG TIME
+                'time2':            duration2, #DEBUG TIME
+                'time3':            duration3, #DEBUG TIME
+                'nbIter':           Algo_approx.itCount,
+                'flops':            flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC,switch_it),
+                'time_per_it':      time_per_it,
+                'problem':          problem,
+                'stopCrit':         Algo_approx.stopCrit,
+                'monVar':           monvar,
+                'switch_it':        switch_it}
+                   
+    return Result    
+
+
+def solver_multiple(y=None, D=None, RC=1, normE_all=np.zeros(1), norm2E_all=0, dict_specs=None, lasso=None, Gr=[], problem=None, stop = dict(), switching = '',
+               L='backtracking',scr_type="Dome",EmbedTest='dynamic',mon=False,
+               algo_type ='FISTA', warm_start = None, verbose=0, switching_gamma=2e-1):
+    """
+    This function solve the Lasso and Group-Lasso problems for a dictionary D,
+    an observation y and a regularization parameter :math:`\lambda`
+    thanks to iterative first order algorithm (ISTA, FISTA, SpARSA, Chambolle-Pock) 
+    with 3 possible screening strategy (none/'static'/'dynamic').
+    
+    The problem that are solvedd are the Lasso:
+    
+    .. math::    
+         \min_{x \in {R}^N} \dfrac{1}{2} \| Dx - y \| + \lambda \|x\|_1
+                  
+                  
+    and the Group-Lasso :
+    
+    .. math::
+         \min_{x \in {R}^N} \dfrac{1}{2} \| Dx - y \| + \lambda \sum_{g \in \mathcal{G}}\|x_g\|_2
+         
+         
+            
+    Parameters
+    -----------
+    y : 1-column array, float
+        the observation if not normalized we normalize it.
+         
+    D : Dict from BuildDict module or ndarray
+        the dictionnary (each atoms is normalized if a ndarray is given)
+     
+    lasso : float
+        the penalization parameter :math:`\lambda`
+        
+    Gr : list of tuple default ([]: no grouping)
+        the groups of dictionary columns :math:`\mathcal{G}`
+        
+    problem : Problem class instance, optional
+        the problem to solve, (alternative to the 4 previous entries)
+         
+    stop : dict
+        - 'rel_tol' for relative variation of the functional stopping criterion
+        - 'max_iter' for fixing maximum iteration number 
+
+    L : ['backtracking'],float,None
+        step size strategy ( when None: is computed as  L = ||D||^2 very slow)
+        
+    scr_type : 'ST1', 'ST3' or ['Dome']
+        choose the screening test
+        
+    algo_type : string
+        Name of the algo among ISTA, [FISTA], SPARSA, Chambolle-Pock
+        
+    EmbedTest : None, 'static' or ['dynamic']
+        embedded screening is performed if 'dynamic', 
+        static screening is performed if 'static' and 
+        no screening when None
+        
+    mon : boolean
+        True to monitor the iterates, and screening vectors
+        
+    warm_start : array_like
+        Specify the initial value a x
+    
+    switching_gamma : parameter that controls the convergence-based switching
+        criterion. The closest to zero switching_gamma is, the longer the 
+        approximate dictionary is kept.
+    
+    Returns
+    ---------
+    res : dict
+        {'sol':         sparse code of y;
+        'eval':         objective value;
+        'objective':    array of objective values along iterations;
+        'radius':       radius values along iterations;
+        'screenrate':   screening rates along iterations;
+        'zeros':        numbers of zeros in the iterates alogn the iterations;
+        'dGaps':        dualGaps;
+        'time':         duration;
+        'nbIter':       number of iteration;
+        'flops':        number of flops;
+        'problem':      problem solved;
+        'stopCrit':     the stoping criterion used;
+        'monVar':       additional monitored variables}
+        
+    See Also
+    --------
+    BuildDict, Problem, 
+     
+    """      
+    
+    
+    if not np.logical_xor( problem!=None, (D!=None and y!=None and lasso!=None)):
+        raise NameError(" Problem must be specified, and only once")
+        
+    if not problem:
+        if Gr:        
+            problem = GroupLasso(D, y, Gr, lasso)
+        else:
+            problem = Lasso(D,y,lasso)
+            
+    if algo_type in [cls.__name__ for cls in OptimAlgo.__subclasses__()]:
+        Algo_approx = selfmod.__getattribute__(algo_type)(problem)
+    
+    # Set the value of L if needed
+    if L == None:
+        print "computation of the square norm of D... might be long"
+        L = LA.norm(problem.D.data,ord=2)**2 
+
+    # Convergence switching criterion
+    stop_approx = stop.copy()
+    if switching is not 'screening_only': # No convergence criterion for switching
+        if ('dgap_tol' in  stop.keys()) or ('dgap_rel_tol'  in  stop.keys()):
+            # gap ratio - switching criterion
+            stop_approx["dgap_ratio"] = switching_gamma # 2e-1 gives very close results to stop_approx["dgap_rel_tol"] = 5e-3. 5e-2 seems to give better results for MEG
+            # gap relative variation - switching criterion
+#            stop_approx["dgap_rel_tol"] = 5e-3
+            # gap absolute variation - switching criterion
+#            stop_approx["dgap_tol"] = np.mean(normE)
+#            stop_approx["dgap_tol"] = 1e-1*np.mean(normE); print "MODIF! stop_approx" # Never switches
+        else:
+            #TODO - rel_tol needs to be redefin for each dict. approx.
+            raise ValueError('convergence switching criterion rel_tol not implemented')
+            #stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(np.mean(normE)**2)
+
+    checkpoint1, checkpoint2, checkpoint3 = list(),list(),list() # DEBUG TIME
+    checkpoint4, checkpoint5, checkpoint6 = list(),list(),list() # DEBUG TIME
+    checkpoint7, checkpoint8 = list(),list() # DEBUG TIME
+    
+    startTime = time.time()  
+    
+    # initialize the variables 
+    N,K = problem.D.shape
+    Algo_approx.initialization( L=L, warm_start = warm_start, stop = stop_approx)
+         
+
+    Screen = ScreenTestApprox(K,scr_type + "_approx") #"ST1_approx")
+    
+    Rate, Rate_old, Rate_est = 0, 0, 0
+                
+    objective = [problem.objective(Algo_approx.x, Screen)]
+    rayons = [Screen.R]
+    screenrate = [Screen.GetRate()]
+    screenrate_est = [Screen.GetRateEst()] # Overhead
+    zeros = [K - np.count_nonzero(Algo_approx.x)]
+    dGaps = [problem.dualGap(Algo_approx.x,Screen = Screen)]
+    dGaps_est = list(dGaps) # It contains the dgap_est, calculated with feasDual_est (unsafe!). It doesn't saturate before switching as does the real gap.
+    
+    if mon: # monitoring data
+        xmon = np.array(Algo_approx.x)
+        screenmon = np.array(Screen.screen[np.newaxis].T)
+    
+    ## Enter the Loop of approximate problem (before switching)
+    switch_it = []    
+    nb_approx = len(norm2E_all)
+    k_approx = 0
+    #while not  switching_criterion(N,K,RC[k_approx],Rate,Rate_old,Rate_est) and k_approx < nb_approx: # switches to next approx. dictionary or directly to original dictionary (if transition is due to switching level)
+    while k_approx < nb_approx: # switches to next approx. dictionary or directly to original dictionary (if transition is due to switching level)
+        normE = normE_all[k_approx]
+        norm2E = norm2E_all[k_approx]
+        # Updating current dict
+        if problem.D.opType is 'sukro':       
+            problem.D.nkron = dict_specs[k_approx]
+        elif problem.D.opType is 'faust':
+            problem.D = dict_specs[k_approx]
+        else:
+            raise NameError('Multiple dictionaries solver not defined for this type of dictionary')
+        
+        while not  switching_criterion(N,K,RC[k_approx],Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit:
+            checkpoint1.append(time.time()) # DEBUG TIME
+            #####    One Iteration step    #############
+            Algo_approx.Iterate(Screen)
+            checkpoint2.append(time.time()) # DEBUG TIME        
+            
+            #####    Dynamic Screening    ##############
+            # dynamic screening
+            if EmbedTest=='dynamic':               
+                if Screen.init==0: # at the first iteration need to compute the test vector
+                    scalProd = None
+                    if not 'scalProd' in dir(Screen):
+                        # Using original atoms for the term |d^T c|. Internal product needs to be computed anyway
+                        scalProd = problem.D_bis.ApplyTranspose(problem.y) #TODO: GAP doesn't use it. So this calculation could be avoided.
+                        # Using atoms from the approximate dictionary. Can be taken from the algorithm iteration in case of no warm_start
+#                        if warm_start is None:
+#                            if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+#                                scalProd = -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma
+#                            else:
+#                                scalProd = -Algo_approx.grad
+                    Screen.Initialisation(problem, scalProd, \
+                                                  lasso=problem.pen_param, normE = normE, norm2E = norm2E)
+    
+                Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
+                # screen with the new test
+                Screen.SetScreen()
+                Rate_old = Rate         # the swtiching criterion need the previous rate
+                Rate = Screen.GetRate()
+                Rate_est = Screen.GetRateEst() # Overhead
+    
+            checkpoint3.append(time.time()) # DEBUG TIME
+            Algo_approx.itCount += 1 
+            Algo_approx.StopCrit(Screen,EmbedTest)
+            
+            rayons.append(Screen.newR)
+            objective.append(Algo_approx.lastErrs[-1])
+            screenrate.append(Rate)
+            screenrate_est.append(Rate_est) # Overhead
+            zeros.append( K - np.count_nonzero(Algo_approx.x))
+            dGaps.append(Algo_approx.dgap)
+            dGaps_est.append(Algo_approx.dgap_est)
+    
+            if mon: # monitoring data
+                screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
+                xmon = np.append(xmon,Algo_approx.x,axis=1)
+            checkpoint4.append(time.time()) # DEBUG TIME
+    
+        duration1 = time.time() - startTime #DEBUG TIME
+        time_per_it = checkpoint4 - np.append(startTime,checkpoint4[:-1])
+
+        ## Change dictionary
+        # Reinitialisations - Overhead
+        switch_it.append(Algo_approx.itCount)
+        Screen.init = 0 #TODO is it really necessary to reinitialize ?
+        Algo_approx.stopCrit = ''
+        k_approx += 1 #index of next approximate dictionary
+
+    
+    ## Enter the Loop of original problem
+    Screen.TestType = scr_type #'ST1'
+    
+    #Algo_approx.D = problem.D_bis # artigo
+    if 'dgap_rel_tol' in  stop.keys():
+        Algo_approx.stopParams["dgap_rel_tol"] = stop["dgap_rel_tol"]
+        Algo_approx.stopParams["dgap_ratio"] = -np.inf
+    elif 'dgap_tol' in  stop.keys():
+        Algo_approx.stopParams["dgap_tol"] = stop["dgap_tol"]
+        Algo_approx.stopParams["dgap_rel_tol"] = -np.inf
+        Algo_approx.stopParams["dgap_ratio"] = -np.inf
     else:
         Algo_approx.stopParams["rel_tol"] = stop["rel_tol"]
         
@@ -597,6 +969,355 @@ def solver_approx(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None,
                    
     return Result    
 
+## Calculates the conventional screening rate parallel to the stable screening
+## as a comparison (if desired).
+## See variable 'Screen_conv'
+def solver_approx_parallel(y=None, D=None, RC=1, normE=np.zeros(1), norm2E=0, lasso=None, Gr=[], problem=None, stop = dict(), switching = '',
+               L='backtracking',scr_type="Dome",EmbedTest='dynamic',mon=False, 
+               algo_type ='FISTA', warm_start = None, verbose=0, switching_gamma=2e-1):
+    """
+    This function solve the Lasso and Group-Lasso problems for a dictionary D,
+    an observation y and a regularization parameter :math:`\lambda`
+    thanks to iterative first order algorithm (ISTA, FISTA, SpARSA, Chambolle-Pock) 
+    with 3 possible screening strategy (none/'static'/'dynamic').
+    
+    The problem that are solvedd are the Lasso:
+    
+    .. math::    
+         \min_{x \in {R}^N} \dfrac{1}{2} \| Dx - y \| + \lambda \|x\|_1
+                  
+                  
+    and the Group-Lasso :
+    
+    .. math::
+         \min_{x \in {R}^N} \dfrac{1}{2} \| Dx - y \| + \lambda \sum_{g \in \mathcal{G}}\|x_g\|_2
+         
+         
+            
+    Parameters
+    -----------
+    y : 1-column array, float
+        the observation if not normalized we normalize it.
+         
+    D : Dict from BuildDict module or ndarray
+        the dictionnary (each atoms is normalized if a ndarray is given)
+     
+    lasso : float
+        the penalization parameter :math:`\lambda`
+        
+    Gr : list of tuple default ([]: no grouping)
+        the groups of dictionary columns :math:`\mathcal{G}`
+        
+    problem : Problem class instance, optional
+        the problem to solve, (alternative to the 4 previous entries)
+         
+    stop : dict
+        - 'rel_tol' for relative variation of the functional stopping criterion
+        - 'max_iter' for fixing maximum iteration number 
+
+    L : ['backtracking'],float,None
+        step size strategy ( when None: is computed as  L = ||D||^2 very slow)
+        
+    scr_type : 'ST1', 'ST3' or ['Dome']
+        choose the screening test
+        
+    algo_type : string
+        Name of the algo among ISTA, [FISTA], SPARSA, Chambolle-Pock
+        
+    EmbedTest : None, 'static' or ['dynamic']
+        embedded screening is performed if 'dynamic', 
+        static screening is performed if 'static' and 
+        no screening when None
+        
+    mon : boolean
+        True to monitor the iterates, and screening vectors
+        
+    warm_start : array_like
+        Specify the initial value a x
+
+    switching_gamma : parameter that controls the convergence-based switching
+        criterion. The closest to zero switching_gamma is, the longer the 
+        approximate dictionary is kept.        
+    
+    Returns
+    ---------
+    res : dict
+        {'sol':         sparse code of y;
+        'eval':         objective value;
+        'objective':    array of objective values along iterations;
+        'radius':       radius values along iterations;
+        'screenrate':   screening rates along iterations;
+        'zeros':        numbers of zeros in the iterates alogn the iterations;
+        'dGaps':        dualGaps;
+        'time':         duration;
+        'nbIter':       number of iteration;
+        'flops':        number of flops;
+        'problem':      problem solved;
+        'stopCrit':     the stoping criterion used;
+        'monVar':       additional monitored variables}
+        
+    See Also
+    --------
+    BuildDict, Problem, 
+     
+    """      
+    
+    
+    if not np.logical_xor( problem!=None, (D!=None and y!=None and lasso!=None)):
+        raise NameError(" Problem must be specified, and only once")
+        
+    if not problem:
+        if Gr:        
+            problem = GroupLasso(D, y, Gr, lasso)
+        else:
+            problem = Lasso(D,y,lasso)
+            
+    if algo_type in [cls.__name__ for cls in OptimAlgo.__subclasses__()]:
+        Algo_approx = selfmod.__getattribute__(algo_type)(problem)
+    
+    # Set the value of L if needed
+    if L == None:
+        print "computation of the square norm of D... might be long"
+        L = LA.norm(problem.D.data,ord=2)**2 
+
+    # Convergence switching criterion
+    stop_approx = stop.copy()
+#    if switching is not 'screening_only': # No convergence criterion for switching
+    if switching not in {'screening_only','off'}: # No convergence criterion for switching
+        if ('dgap_tol' in  stop.keys()) or ('dgap_rel_tol'  in  stop.keys()):
+            # gap ratio - switching criterion
+            stop_approx["dgap_ratio"] = switching_gamma # 2e-1 gives very close results to stop_approx["dgap_rel_tol"] = 5e-3. 5e-2 seems to give better results for MEG
+            # gap relative variation - switching criterion
+#            stop_approx["dgap_rel_tol"] = 5e-3
+            # gap absolute variation - switching criterion
+#            stop_approx["dgap_tol"] = np.mean(normE)
+#            stop_approx["dgap_tol"] = 1e-1*np.mean(normE); print "MODIF! stop_approx" # Never switches
+        elif 'rel_tol' in  stop.keys():
+            stop_approx["rel_tol"] = stop["rel_tol"]*1e8*(np.mean(normE)**2)
+        elif 'conv_speed' in  stop.keys():
+            stop_approx["conv_speed"] = np.mean(normE)**2 # not calibrated by experiments
+        else:
+            raise NotImplementedError('Convergence-based switching criterion not defined for this particular convergence criterion')
+
+    checkpoint1, checkpoint2, checkpoint3 = list(),list(),list() # DEBUG TIME
+    checkpoint4, checkpoint5, checkpoint6 = list(),list(),list() # DEBUG TIME
+    checkpoint7, checkpoint8 = list(),list() # DEBUG TIME
+    
+    startTime = time.time()  
+    
+    # initialize the variables 
+    N,K = problem.D.shape
+    Algo_approx.initialization( L=L, warm_start = warm_start, stop = stop_approx)
+         
+
+    Screen = ScreenTestApprox(K,scr_type + "_approx") #"ST1_approx")
+    
+    Rate, Rate_old, Rate_est = 0, 0, 0
+                
+    objective = [problem.objective(Algo_approx.x, Screen)]
+    rayons = [Screen.R]
+    screenrate = [Screen.GetRate()]
+    screenrate_est = [Screen.GetRateEst()] # Overhead
+    zeros = [K - np.count_nonzero(Algo_approx.x)]
+    dGaps = [problem.dualGap(Algo_approx.x,Screen = Screen)]
+    dGaps_est = list(dGaps) # It contains the dgap_est, calculated with feasDual_est (unsafe!). It doesn't saturate before switching as does the real gap.
+    
+    if mon: # monitoring data
+        xmon = np.array(Algo_approx.x)
+        screenmon = np.array(Screen.screen[np.newaxis].T)
+
+    Screen_conv = ScreenTest(K,scr_type)
+    screenrate_conv = [Screen_conv.GetRate()]
+    problem_conv = Lasso(D=problem.D_bis, y=problem.y, D_bis=problem.D) # Is it really necessary
+    problem_conv.pen_param = problem.pen_param
+#    problem_conv.D, problem_conv.D_bis = problem_conv.D_bis, problem_conv.D # start with the approximate (fast) dictionary
+    
+    ## Enter the Loop of approximate problem (before switching)
+#    while not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) and not Algo_approx.stopCrit:
+    while (not  switching_criterion(N,K,RC,Rate,Rate_old,Rate_est) or switching=='off' ) and not Algo_approx.stopCrit:
+        checkpoint1.append(time.time()) # DEBUG TIME
+        #####    One Iteration step    #############
+        Algo_approx.Iterate(Screen)
+        checkpoint2.append(time.time()) # DEBUG TIME        
+        
+        #####    Dynamic Screening    ##############
+        # dynamic screening
+        if EmbedTest=='dynamic':               
+            if Screen.init==0: # at the first iteration need to compute the test vector
+                # Using original atoms for the term |d^T c|. Internal product needs to be computed anyway
+                scalProd = problem.D_bis.ApplyTranspose(problem.y) #TODO: GAP doesn't use it. So this calculation could be avoided.
+                # Using atoms from the approximate dictionary. Can be taken from the algorithm iteration in case of no warm_start
+#                scalProd = None
+#                if warm_start is None:
+#                    if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+#                        scalProd = -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma
+#                    else:
+#                        scalProd = -Algo_approx.grad
+                Screen.Initialisation(problem, scalProd, \
+                                              lasso=problem.pen_param, normE = normE, norm2E = norm2E)
+                Screen_conv.Initialisation(problem_conv, problem_conv.D.ApplyTranspose(problem_conv.y), \
+                                              lasso=problem_conv.pen_param)                      
+
+            Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
+            _, dualpt_conv, grad_conv = problem_conv.gradient(Algo_approx.xprev, Screen)
+            Screen_conv.RefineR(dualpt_conv,grad_conv,Algo_approx.x)
+            # screen with the new test
+            Screen.SetScreen()
+            Rate_old = Rate         # the swtiching criterion need the previous rate
+            Rate = Screen.GetRate()
+            Rate_est = Screen.GetRateEst() # Overhead
+            
+            Screen_conv.SetScreen()
+            Rate_conv = Screen_conv.GetRate()
+
+        checkpoint3.append(time.time()) # DEBUG TIME
+        Algo_approx.itCount += 1 
+        Algo_approx.StopCrit(Screen,EmbedTest)
+        
+        rayons.append(Screen.newR)
+        objective.append(Algo_approx.lastErrs[-1])
+        screenrate.append(Rate)
+        screenrate_est.append(Rate_est) # Overhead
+        screenrate_conv.append(Rate_conv) # Overhead
+        zeros.append( K - np.count_nonzero(Algo_approx.x))
+        dGaps.append(Algo_approx.dgap)
+        dGaps_est.append(Algo_approx.dgap_est)
+
+        if mon: # monitoring data
+            screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
+            xmon = np.append(xmon,Algo_approx.x,axis=1)
+        checkpoint4.append(time.time()) # DEBUG TIME
+
+    duration1 = time.time() - startTime #DEBUG TIME
+    time_per_it = checkpoint4 - np.append(startTime,checkpoint4[:-1])
+    
+    ## Enter the Loop of original problem
+    # Reinitialisations - Overhead
+    switch_it = Algo_approx.itCount
+    Screen.TestType = scr_type #'ST1'
+    Screen.init = 0 #TODO is it really necessary to reinitialize
+    
+    Algo_approx.stopCrit = ''
+    #Algo_approx.D = problem.D_bis # artigo
+    if 'dgap_rel_tol' in  stop.keys():
+        Algo_approx.stopParams["dgap_rel_tol"] = stop["dgap_rel_tol"]
+    elif 'dgap_tol' in  stop.keys():
+        Algo_approx.stopParams["dgap_tol"] = stop["dgap_tol"]
+        Algo_approx.stopParams["dgap_rel_tol"] = -np.inf
+    elif 'rel_tol' in  stop.keys():
+        Algo_approx.stopParams["rel_tol"] = stop["rel_tol"]
+    elif 'conv_speed' in  stop.keys():
+        Algo_approx.stopParams["conv_speed"] = stop["conv_speed"]
+    elif 'max_iter' in  stop.keys():
+        Algo_approx.stopParams["max_iter"] = stop["max_iter"]
+    else:
+        raise NotImplementedError('Convergence-based switching criterion not defined for this particular convergence criterion')
+        
+    problem.D, problem.D_bis = problem.D_bis, problem.D
+    #Algo_approx.D = problem.D
+    
+    duration2 = time.time() - startTime  - duration1 #DEBUG TIME
+    # Avoiding complexity peak at switching point
+    # screen_est is used on the first iteration instead of screen - Not safe!
+#    screenrate[-1] = Rate_est
+#    rayons[-1] = Screen.newR_est
+#    Screen.screen, Screen.screen_est = Screen.screen_est, Screen.screen
+
+
+    while not Algo_approx.stopCrit:
+        checkpoint5.append(time.time()) # DEBUG TIME
+        #####    One Iteration step    #############
+        Algo_approx.Iterate(Screen)
+        checkpoint6.append(time.time()) # DEBUG TIME
+        
+        #####    Dynamic Screening    ##############
+        # dynamic screening
+        if EmbedTest=='dynamic':
+            if Screen.init==0: # at the first iteration need to compute the test vector
+                if warm_start is None:
+                    if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+                        Screen.Initialisation(problem, \
+                            -Algo_approx.grad*(1+Algo_approx.stepsigma)/Algo_approx.stepsigma)                    
+                    else:
+                        Screen.Initialisation(problem, -Algo_approx.grad,
+                                              lasso=problem.pen_param)
+                else:
+                    if Algo_approx.__class__.__name__ == 'Chambolle-Pock':
+                        Screen.Initialisation(problem)                    
+                    else:
+                        Screen.Initialisation(problem, lasso = problem.pen_param)
+
+            Screen.RefineR(Algo_approx.dualpt,Algo_approx.grad,Algo_approx.x)
+            # screen with the new test
+            Screen.SetScreen()                 
+            Rate = Screen.GetRate()
+
+        checkpoint7.append(time.time()) # DEBUG TIME                                
+        Algo_approx.itCount += 1 
+        Algo_approx.StopCrit(Screen,EmbedTest)      
+        
+        rayons.append(Screen.newR)
+        objective.append(Algo_approx.lastErrs[-1])
+        screenrate.append(Rate)
+        screenrate_est.append(Rate)
+        screenrate_conv.append(Rate) # Overhead
+        zeros.append( K - np.count_nonzero(Algo_approx.x))
+        dGaps.append(Algo_approx.dgap)
+        dGaps_est.append(Algo_approx.dgap_est)
+        
+        if mon: # monitoring data
+            screenmon = np.append(screenmon,Screen.screen[np.newaxis].T,axis=1)
+            xmon = np.append(xmon,Algo_approx.x,axis=1)
+        checkpoint8.append(time.time()) # DEBUG TIME
+    
+    duration3 = time.time() - startTime  - duration2 - duration1 #DEBUG TIME
+    duration = time.time() - startTime
+    time_per_it = np.append(time_per_it, checkpoint8 - np.append(checkpoint4[-1],checkpoint8[:-1]))
+
+    if not(mon):
+        monvar = dict()
+    else:
+        monvar={'xmon':         xmon,
+                'screenmon':    screenmon}
+ 
+#    print "DURATION1: approx dict loop  %.3f ms in %d iterations"%(duration1*1000, switch_it) #DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint2,checkpoint1)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint3,checkpoint2)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint4,checkpoint3)])
+#    print "DURATION2  %.3f ms"%(duration2*1000) #DEBUG TIME
+#    print "DURATION3  %.3f ms in %d iterations"%(duration3*1000,Algo_approx.itCount-switch_it) #DEBUG TIME
+#    print([t2-t1 for t2,t1 in zip(checkpoint6,checkpoint5)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint7,checkpoint6)])
+#    print([t2-t1 for t2,t1 in zip(checkpoint8,checkpoint7)])
+#    print ""    
+    
+    if verbose >=1:
+        print "solved in %d"%(Algo_approx.itCount)
+        
+    Result =   {'sol':              Algo_approx.x,
+                'eval':             objective[-1],
+                'objective':        np.asarray(objective).flatten(),
+                'radius':           np.asarray(rayons),
+                'screenrate':       np.asarray(screenrate, dtype=float),
+                'screenrate_est':   np.asarray(screenrate_est, dtype=float),
+                'screenrate_conv':  np.asarray(screenrate_conv, dtype=float),
+                'zeros':            np.asarray(zeros, dtype=float),
+                'dGaps':            np.asarray(dGaps, dtype=float),
+                'dGaps_est':        np.asarray(dGaps_est, dtype=float),
+                'time':             duration,
+                'time1':            duration1, #DEBUG TIME
+                'time2':            duration2, #DEBUG TIME
+                'time3':            duration3, #DEBUG TIME
+                'nbIter':           Algo_approx.itCount,
+                'flops':            flop_calc(EmbedTest,K,N,screenrate,zeros,Gr,RC,switch_it),
+                'time_per_it':      time_per_it,
+                'problem':          problem,
+                'stopCrit':         Algo_approx.stopCrit,
+                'monVar':           monvar,
+                'switch_it':        switch_it}
+                   
+    return Result    
+
 ####################################################
 ###  Iterative Optimization Algorithms
 ####################################################
@@ -656,7 +1377,8 @@ class OptimAlgo(object):
                             'conv_speed':   -np.inf,
                             'max_iter':      np.inf,
                             'dgap_tol':     -np.inf,
-                            'dgap_rel_tol': -np.inf}
+                            'dgap_rel_tol': -np.inf,
+                            'dgap_ratio':   -np.inf}
         try :
             if set(stop.keys()).issubset(set(self.stopParams.keys())):           
                 self.stopParams.update(stop)
@@ -697,10 +1419,10 @@ class OptimAlgo(object):
         self.stopCrit =''
         
         # Calculate Dual Gap if necessary
-        if (self.stopParams['dgap_tol'] != -np.inf) or (self.stopParams['dgap_rel_tol'] != -np.inf):
-            if Screen.TestType in {"GAP","GAP_approx"} and EmbedTest is "dynamic": #Screen.dgap != self.dgap: # gap has already been calculated for the screening (GAP Safe dynamic rule)
+        if (self.stopParams['dgap_tol'] != -np.inf) or (self.stopParams['dgap_rel_tol'] != -np.inf) or (self.stopParams['dgap_ratio'] != -np.inf):
+            if Screen.TestType in {"GAP","GAP_approx"} and EmbedTest == "dynamic": #Screen.dgap != self.dgap: # gap has already been calculated for the screening (GAP Safe dynamic rule)
                 self.dgap = Screen.dgap
-                if Screen.TestType is "GAP_approx": self.dgap_est = Screen.dgap_est
+                if Screen.TestType == "GAP_approx": self.dgap_est = Screen.dgap_est
             else:
                 if hasattr(Screen, 'feasDual'): # dynamic screening - feasible point already calculated
                     feasDual = Screen.feasDual
@@ -723,6 +1445,10 @@ class OptimAlgo(object):
                 (max(self.lastDgaps) - min(self.lastDgaps))/(self.lastDgaps[-1] + 1e-10) < self.stopParams['dgap_rel_tol']:
                 #(max(self.lastDgaps) - min(self.lastDgaps)) < self.stopParams['dgap_rel_tol']: #TODO see if it's better to divide or not
                 self.stopCrit += 'Dgap_Tol'+ str(self.stopParams['dgap_rel_tol'])
+            
+            # dgap_ratio
+            if  self.itCount>1 and self.dgap_est/self.dgap < self.stopParams['dgap_ratio']:
+                self.stopCrit += 'Dgap_Ratio'+ str(self.stopParams['dgap_ratio'])
 
 
         self.lastErrs.append(self.loss+self.lasso*self.reg)
@@ -1230,6 +1956,7 @@ class ScreenTestApprox:
         self.normE = normE.ravel()
         #self.normE = normE
         self.norm2E2 = norm2E**2
+        self.normE_21 = np.max(self.normE)**2 #TEST_OPNORM Testing bounds using different operator norm
 
 
         if problem.__class__.__name__ == 'Lasso':    
@@ -1340,6 +2067,7 @@ class ScreenTestApprox:
         if self.TestType in {"GAP","GAP_approx"}:
             self.dgap = self.problem.dualGap(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual)
             normE2x2 = self.norm2E2*x.T.dot(x)
+            #normE2x2 = self.normE_21*(np.abs(x).sum())**2 #TEST_OPNORM Testing bounds using different operator norm 
             margin_dgap = 0.5*normE2x2 + np.sqrt(normE2x2*dualN2) #*(1 + self.lasso*self.normy/(2*dualN2)) dual margin - not necessary
             self.newR = np.sqrt(2*(self.dgap + margin_dgap))/self.lasso
             self.testvect = self.margin - 1 -mu*np.abs(grad).ravel() # Addind |x^T c| which changes since c = \theta            

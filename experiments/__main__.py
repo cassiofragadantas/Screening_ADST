@@ -16,6 +16,8 @@ import argparse
 import expe
 
 import expe_approx
+
+import expe_journal
                                  
 if __name__=='__main__':
 
@@ -50,7 +52,10 @@ Indicate which experiment to run.
                        dest = 'algo_type')
     parser.add_argument('-stop', nargs = 1,type = float,  metavar = 'val',
                        help='Change the stopping criteria threshold : 1e-8(default)',
-                       dest = 'stop')     
+                       dest = 'stop')
+    parser.add_argument('-decay', nargs = 1,type = float, metavar = 'val',
+                       help='(Only if dict_type is sukro_approx) Changes the dictionary approximation-speedup compromise (higher decay implies better compromises)',
+                       dest = 'svd_decay_const_list')
     parser.add_argument('-extra', nargs = 2,  metavar = ('option','value'),
                        help='Change extra default values : -extra scr_type ST1',
                        action = 'append') 
@@ -90,6 +95,21 @@ Indicate which experiment to run.
         expe_approx.second_sukro(option)
     elif args.Expe[0]==8: 
         expe_approx.second_sukro_per_it(option)
+    # Jounal experiments
+    elif args.Expe[0]==9: 
+        expe_journal.first(option)
+    elif args.Expe[0]==10:
+        expe_journal.second(option)
+    elif args.Expe[0]==11:
+        expe_journal.complete(option)
+    elif args.Expe[0]==12:
+        expe_journal.approx_RC_compromise(option)
+    elif args.Expe[0]==13:
+        expe_journal.scatterplot_screening_rates(option)
+    elif args.Expe[0]==14:
+        expe_journal.gap_evolution_it_time(option)
+    elif args.Expe[0]==15:
+        expe_journal.gap_evolution_it_time_tol(option)
     else:
         print 'Experiment number Not valid'
     

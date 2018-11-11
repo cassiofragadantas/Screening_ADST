@@ -29,13 +29,16 @@ def mergeopt(opt, default, keywords):
     return opt
 
 def make_file_name(opt):
-    for key in opt.keys():
-        exec(key+' = '+repr(opt[key]))  
+#    for key in opt.keys():
+#        exec(key+' = '+repr(opt[key]))  
     name = opt['algo_type']+'_'+opt['dict_type']+'-dict_'+opt['data_type']+'-data_N'+str(opt['N'])+"_K"+\
             str(opt['K'])+'_'+str(opt['scr_type'])
 
     if opt['dict_type'] == 'sukro':
         name += "_sep-terms"+str(opt['dict_params']['n_kron'])
+        
+    if opt['dict_type'] == 'sukro_approx':
+        name += "_decay"+str(opt['dict_params']['svd_decay_const'])
        
     if opt['sparse'] != None:
         name += "_sp"+str(opt['sparse'])
@@ -96,7 +99,7 @@ def testopt(opt):
     if opt['algo_type'] not in ['ISTA','FISTA','SPARSA','Chambolle_Pock','TWIST']:
         raise NotImplementedError(opt['algo_type']+' Algorithm is not implemented yet')
         exit(0)
-    if opt['dict_type'] not in ['gnoise','pnoise','sukro','low-rank','DCT','MEG']:
+    if opt['dict_type'] not in ['gnoise','pnoise','sukro','low-rank','DCT','MEG','sukro_approx']:
         raise ValueError('Not Valid dictionary')
     if opt['data_type'] not in ['gnoise','pnoise','bernoulli-gaussian','MNIST','audio','audioSynth','cancer']:
         raise ValueError('Not Valid data type')

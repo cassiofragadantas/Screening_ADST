@@ -77,7 +77,7 @@ def first_sukro(opt =dict(), **keywords): #expe 6
     np.random.seed(0)
     #np.random.seed(10) #used for figures with y=X\beta           
     
-    lasso_list = [0.5] #[0.5, 0.75, 0.85]
+    lasso_list = [0.1] #[0.5, 0.75, 0.85]
     
     for lasso in lasso_list:
 
@@ -96,9 +96,11 @@ def first_sukro(opt =dict(), **keywords): #expe 6
         # MEG
 #        default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian', lasso=lasso,N=204, K=8193,\
 #                        stop=dict(dgap_rel_tol=1e-5, max_iter=10000), scr_type = "GAP", switching='default')
+        default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian', lasso=lasso,N=204, K=8193,\
+                        stop=dict(dgap_tol=1e-4, max_iter=10000), scr_type = "GAP", switching='default', algo_type = 'FISTA')
         # Test
-        default =  dict(dict_type = 'gnoise', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
-                        stop=dict(dgap_tol=1e-5, max_iter=1000), scr_type = "ST1", switching='default')
+#        default =  dict(dict_type = 'gnoise', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
+#                        stop=dict(dgap_tol=1e-5, max_iter=1000), scr_type = "ST1", switching='default')
 #        default = dict(dict_type = 'sukro',data_type = 'gnoise', lasso=lasso, N=2500,K=10000,scr_type = "GAP",\
 #                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),\
 #                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default') #, wstart=True)
@@ -137,7 +139,7 @@ def second_sukro(opt=dict(), **keywords):
 #                    stop=dict(dgap_tol=5e-6, max_iter=1000), switching='default') #, wstart=True)
     default = dict(dict_type = 'sukro',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
                     dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = 20),nbRuns=1,\
-                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='default',
+                    stop=dict(dgap_tol=1e-5, max_iter=1000), switching='default',
                     samp=5, min_reg=0.01, samp_type='log') #, wstart=True)
     
     expe = mergeopt(opt, default, keywords)
@@ -724,7 +726,13 @@ def run3versions(problem=None, RC=1, opt={}, warm_start = None, **keywords):
 #        normE = 1e-3
 #        D_bis = D.data + normE*E
 #        D_bis = Dict(D_bis)
-                
+
+        # Load 'y' for benchmark with Matlab
+#        meg_data = sio.loadmat('./datasets/MEG/faust_approx/Data.mat')
+#        y = meg_data['Data'][:,0]
+#        y = np.expand_dims(y, -1)
+#        del meg_data
+
         problem, opt = GP.generate(opt,D=D,D_bis=D_bis)
         if warm_start: raise ValueError('Warm start is not available for this configuration, since the input vector y is regenerated every time.')
                     
