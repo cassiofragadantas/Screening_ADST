@@ -772,6 +772,8 @@ def solver_multiple(y=None, D=None, RC=1, normE_all=np.zeros(1), norm2E_all=0, d
     screenrate_est = [Screen.GetRateEst()] # Overhead
     zeros = [K - np.count_nonzero(Algo_approx.x)]
     dGaps = [problem.dualGap(Algo_approx.x,Screen = Screen)]
+#    dual = [] #MODIF
+#    primal = [] #MODIF
     dGaps_est = list(dGaps) # It contains the dgap_est, calculated with feasDual_est (unsafe!). It doesn't saturate before switching as does the real gap.
     
     if mon: # monitoring data
@@ -789,7 +791,7 @@ def solver_multiple(y=None, D=None, RC=1, normE_all=np.zeros(1), norm2E_all=0, d
         # Updating current dict
         if problem.D.opType is 'sukro':       
             problem.D.nkron = dict_specs[k_approx]
-        elif problem.D.opType is 'faust':
+        elif problem.D.opType in {'faust','low-rank'}:
             problem.D = dict_specs[k_approx]
         else:
             raise NameError('Multiple dictionaries solver not defined for this type of dictionary')
@@ -834,6 +836,8 @@ def solver_multiple(y=None, D=None, RC=1, normE_all=np.zeros(1), norm2E_all=0, d
             screenrate_est.append(Rate_est) # Overhead
             zeros.append( K - np.count_nonzero(Algo_approx.x))
             dGaps.append(Algo_approx.dgap)
+#            dual.append(Algo_approx.dual) #MODIF
+#            primal.append(Algo_approx.primal) #MODIF
             dGaps_est.append(Algo_approx.dgap_est)
     
             if mon: # monitoring data
@@ -915,6 +919,8 @@ def solver_multiple(y=None, D=None, RC=1, normE_all=np.zeros(1), norm2E_all=0, d
         screenrate_est.append(Rate)
         zeros.append( K - np.count_nonzero(Algo_approx.x))
         dGaps.append(Algo_approx.dgap)
+#        dual.append(Algo_approx.dual) #MODIF
+#        primal.append(Algo_approx.primal) #MODIF
         dGaps_est.append(Algo_approx.dgap_est)
         
         if mon: # monitoring data
@@ -954,6 +960,8 @@ def solver_multiple(y=None, D=None, RC=1, normE_all=np.zeros(1), norm2E_all=0, d
                 'screenrate_est':   np.asarray(screenrate_est, dtype=float),
                 'zeros':            np.asarray(zeros, dtype=float),
                 'dGaps':            np.asarray(dGaps, dtype=float),
+#                'dual':             np.asarray(dual, dtype=float), #MODIF
+#                'primal':           np.asarray(primal, dtype=float), #MODIF
                 'dGaps_est':        np.asarray(dGaps_est, dtype=float),
                 'time':             duration,
                 'time1':            duration1, #DEBUG TIME
@@ -1396,6 +1404,8 @@ class OptimAlgo(object):
             
 
         self.dgap = np.inf
+#        self.dual = -np.inf #MODIF
+#        self.primal = np.inf #MODIF
         self.dgap_est = np.inf #calculated with feasDual_est
         if warm_start is None:
             self.x = np.zeros((K,1),dtype=np.float,order='F')    
@@ -1422,6 +1432,8 @@ class OptimAlgo(object):
         if (self.stopParams['dgap_tol'] != -np.inf) or (self.stopParams['dgap_rel_tol'] != -np.inf) or (self.stopParams['dgap_ratio'] != -np.inf):
             if Screen.TestType in {"GAP","GAP_approx"} and EmbedTest == "dynamic": #Screen.dgap != self.dgap: # gap has already been calculated for the screening (GAP Safe dynamic rule)
                 self.dgap = Screen.dgap
+#                self.dual = Screen.dual #MODIF
+#                self.primal = Screen.primal #MODIF
                 if Screen.TestType == "GAP_approx": self.dgap_est = Screen.dgap_est
             else:
                 if hasattr(Screen, 'feasDual'): # dynamic screening - feasible point already calculated
@@ -1433,6 +1445,7 @@ class OptimAlgo(object):
                     feasDual = mu*self.dualpt
                     
                 self.dgap = self.problem.dualGap(self.x,dualpt=self.dualpt, grad=self.grad,  feasDual = feasDual)
+#                _,self.primal,self.dual = self.problem.dualGap_all(self.x,dualpt=self.dualpt, grad=self.grad,  feasDual = feasDual) # MODIF
                 # Calculating dgap_est. Computational overhead but only used (maybe) as switching criterion. Otherwise, could be removed
                 if hasattr(Screen, 'feasDual_est'): self.dgap_est = self.problem.dualGap(self.x,dualpt=self.dualpt, grad=self.grad,  feasDual = Screen.feasDual_est) 
 
@@ -1491,7 +1504,9 @@ class OptimAlgo(object):
         This method set the step size
         """
         if self.L != 'backtracking':
-            return True
+            loss = self.problem.loss(self.xtmp,Screen) # MODIF: fixed step-size wasn't working before, since loss and reg were never calculated
+            reg = self.problem.reg(self.xtmp, Screen)
+            return True, loss, reg
         ### the usual Backtracking strategy
         else:
             loss = self.problem.loss(self.xtmp,Screen)
@@ -1735,6 +1750,8 @@ class ScreenTest:
         self.R = np.inf
         self.newR = np.inf
         self.dgap = np.inf
+#        self.dual = - np.inf #MODIF
+#        self.primal = np.inf #MODIF
         self.star = -1
         self.lstar = -1
         self.init = 0
@@ -1854,6 +1871,7 @@ class ScreenTest:
         self.feasDual =  mu*dualPt
         if self.TestType == "GAP":
             self.dgap = self.problem.dualGap(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual)
+#            _,self.primal,self.dual = self.problem.dualGap_all(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual) #MODIF
             self.newR = np.sqrt(2*(self.dgap))/self.lasso
             self.testvect = - 1 -mu*np.abs(grad) # Addind |x^T c| which changes since c = \theta            
         else:
@@ -1913,6 +1931,8 @@ class ScreenTestApprox:
         self.R = np.inf
         self.newR = np.inf
         self.dgap = np.inf
+#        self.dual = - np.inf #MODIF
+#        self.primal = np.inf #MODIF
         self.dgap_est = np.inf
         self.star = -1
         self.lstar = -1
@@ -2066,6 +2086,7 @@ class ScreenTestApprox:
         # Radius calculation
         if self.TestType in {"GAP","GAP_approx"}:
             self.dgap = self.problem.dualGap(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual)
+#            _,self.primal,self.dual = self.problem.dualGap_all(x,dualpt=dualPt, grad= grad, feasDual = self.feasDual) # MODIF
             normE2x2 = self.norm2E2*x.T.dot(x)
             #normE2x2 = self.normE_21*(np.abs(x).sum())**2 #TEST_OPNORM Testing bounds using different operator norm 
             margin_dgap = 0.5*normE2x2 + np.sqrt(normE2x2*dualN2) #*(1 + self.lasso*self.normy/(2*dualN2)) dual margin - not necessary

@@ -18,6 +18,8 @@ import expe
 import expe_approx
 
 import expe_journal
+
+import os
                                  
 if __name__=='__main__':
 
@@ -77,7 +79,9 @@ Indicate which experiment to run.
     if args.shape!=None:        
         option['N']=args.shape[0]
         option['K']=args.shape[1]
-        
+
+    if 'ResSynthData' not in os.listdir('./'):
+        os.mkdir('ResSynthData')
         
     if args.Expe[0]==1: 
         expe.first(option)
@@ -110,6 +114,8 @@ Indicate which experiment to run.
         expe_journal.gap_evolution_it_time(option)
     elif args.Expe[0]==15:
         expe_journal.gap_evolution_it_time_tol(option)
+    elif args.Expe[0]==16:
+        expe_journal.MEG_gap_evolution_it_time_tol(option)
     else:
         print 'Experiment number Not valid'
     

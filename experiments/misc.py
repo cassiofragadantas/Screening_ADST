@@ -38,6 +38,8 @@ def make_file_name(opt):
         name += "_sep-terms"+str(opt['dict_params']['n_kron'])
         
     if opt['dict_type'] == 'sukro_approx':
+        if not opt['dict_params'].has_key('svd_decay_const'):
+            opt['dict_params']['svd_decay_const'] = 0.5
         name += "_decay"+str(opt['dict_params']['svd_decay_const'])
        
     if opt['sparse'] != None:
@@ -99,7 +101,7 @@ def testopt(opt):
     if opt['algo_type'] not in ['ISTA','FISTA','SPARSA','Chambolle_Pock','TWIST']:
         raise NotImplementedError(opt['algo_type']+' Algorithm is not implemented yet')
         exit(0)
-    if opt['dict_type'] not in ['gnoise','pnoise','sukro','low-rank','DCT','MEG','sukro_approx']:
+    if opt['dict_type'] not in ['gnoise','pnoise','sukro','low-rank','DCT','MEG','MEG_low-rank','sukro_approx']:
         raise ValueError('Not Valid dictionary')
     if opt['data_type'] not in ['gnoise','pnoise','bernoulli-gaussian','MNIST','audio','audioSynth','cancer']:
         raise ValueError('Not Valid data type')

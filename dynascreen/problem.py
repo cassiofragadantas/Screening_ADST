@@ -100,6 +100,33 @@ class Lasso(Problem):
         
         return dgap            
         
+    # MODIFS for normalizing duality gap (MEG experiments)
+    def dualGap_all(self, x, Screen = None, dualpt = None, grad = None, feasDual = None ):
+        if dualpt is None or grad is None:
+            if Screen is None:
+                Screen = np.ones_like(x,dtype=np.int)
+            app, dualpt, grad = self.gradient(x, Screen)
+            #feasibility_coef  =  min(1, 1.0 / LA.norm(grad , np.inf)) # dual scaling
+            feasibility_coef = min(1, 1.0 / LA.norm(grad , np.inf)) if LA.norm(grad , np.inf) else 1 # dual scaling - avoiding division by 0
+            feasDual = feasibility_coef * dualpt
+
+        primal = self.primal(x,dualpt)
+        dual = self.dual(feasDual)
+        
+        return primal-dual, primal, dual           
+        
+    def dual(self, feasDual = None ):
+        dual = float(0.5 * self.normy2 \
+            - (0.5*self.pen_param**2) *np.dot(feasDual.T-self.y.T/self.pen_param,feasDual-self.y/self.pen_param) )
+        
+        return dual
+
+    def primal(self, x, dualpt = None ):
+        primal = float( self.loss(None,None,dualpt)  \
+            + self.pen_param * self.reg(x,None)  )
+        
+        return primal
+        
 class GroupLasso(Problem):
     def __init__(self, D, y, Gr, pen_param = None):
         self.grnorm = None

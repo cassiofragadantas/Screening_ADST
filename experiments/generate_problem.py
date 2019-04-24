@@ -100,17 +100,15 @@ def noise(N, K, dict_type="gnoise",  data_type="gnoise", dict_params={}, data_pa
             D = Dict(D_sukro,opType="sukro",params=dict(A=A,B=B))
         elif dict_type=='sukro_approx': # D is well approximated by SuKro. D_bis is a SuKro dictionary with the maximum n_kron
             D_sukro = np.zeros([N,K])
-            if dict_params.has_key('nkron_max'):
-                nkron_max = dict_params['nkron_max']
-            else:
-                nkron_max = max(dict_params['n_kron'])
+            if not dict_params.has_key('nkron_max'):
+                dict_params['nkron_max'] = max(dict_params['n_kron'])
+            nkron_max = dict_params['nkron_max']
 
             # SVD decay
             if dict_params.has_key('svd_decay') and dict_params['svd_decay'] is 'exponential':
-                if dict_params.has_key('svd_decay_const'):
-                    decay_const = dict_params['svd_decay_const']
-                else:
-                    decay_const = 0.5 #8.5/19 gives round normE for n_kron = {5, 10, 20}
+                if not dict_params.has_key('svd_decay_const'):
+                    dict_params['svd_decay_const'] = 0.5 #8.5/19 gives round normE for n_kron = {5, 10, 20}
+                decay_const = dict_params['svd_decay_const']
                     
                 svd_decay = np.exp(-decay_const*np.linspace(0,N-1,N))
             else:

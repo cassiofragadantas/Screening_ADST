@@ -10,7 +10,7 @@ Created on Mon Mar 18 16:29:46 2014
 import numpy as np  
 import fast_mat_prod as fprod
 import warnings 
-
+from scipy.linalg import blas
 
 class Dict:
     """
@@ -47,8 +47,10 @@ class Dict:
         elif opType=="low-rank":  
             # L and R matrices(such that D = L*R) provided via input 'params'
             #TODO test if L and R are provided. If not, do the SVD.
-            self.L = params['L']
-            self.R = params['R']/ self.normcoef[None,:] # Normalize R
+            self.L = np.asarray(params['L'], dtype=float, order='F') # make sure it is F-contiguous
+            self.R = np.asarray(params['R'], dtype=float, order='F')/ self.normcoef[None,:] # Normalize R
+#            self.Lc = np.asarray(self.L, dtype=float, order='C') # C-contiguous copy
+#            self.Rc = np.asarray(self.R, dtype=float, order='C') # C-contiguous copy
             self.nrank = self.L.shape[1]
         elif opType=="faust":
             #TODO assert that params contains a FAuST object
@@ -97,7 +99,10 @@ class Dict:
                 y2 = y2 + self.B[:,:,r].dot(X.dot(self.A[:,:,r].T))
             return np.reshape(y2,[self.N2*self.N1,1], order='F')
         elif self.opType=="low-rank":
-            return self.L.dot(fprod.BlasCalcDx(self.R,vector,screen)) # Using screening
+            return fprod.BlasCalcDx(self.L, fprod.BlasCalcDx(self.R,vector,screen), np.ones_like(screen)) # Using screening
+#            return self.L.dot(fprod.BlasCalcDx(self.R,vector,screen)) # Using screening
+#            return self.L.dot(self.R.dot(vector)) # without screening
+#            return blas.dgemm(alpha=1., a=self.L, b=blas.dgemm(alpha=1., a=self.R, b=vector, trans_a=False), trans_a=False) 
         elif self.opType=="faust":
             # vector_normalized =  vector/self.normcoef[:,None]
             return self.faust*(vector/self.normcoef[:,None])
@@ -141,7 +146,10 @@ class Dict:
                 y2 = y2 + self.B[:,:,r].T.dot(X.dot(self.A[:,:,r]))
             return np.reshape(y2,[self.K2*self.K1,1], order='F')/self.normcoef[:,None]
         elif self.opType=="low-rank":
-            return fprod.BlasCalcDty(self.R.T,self.L.T.dot(vector),screen) # Using screening
+            return fprod.BlasCalcDty(self.R.T,fprod.BlasCalcDty(self.L.T,vector,np.ones_like(screen)),screen) # Using screening
+#            return fprod.BlasCalcDty(self.R.T,self.L.T.dot(vector),screen) # Using screening
+#            return self.R.T.dot(self.L.T.dot(vector)) # without screening
+#            return blas.dgemm(alpha=1., a=self.R, b=blas.dgemm(alpha=1., a=self.L, b=vector, trans_a=True), trans_a=True) 
         elif self.opType=="faust":
             return (self.faust.transpose()*vector)/self.normcoef[:,None]
 #            return self.faust.transpose()*vector # without normalizing

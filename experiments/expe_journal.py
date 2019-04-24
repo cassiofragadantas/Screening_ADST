@@ -95,8 +95,8 @@ def second(opt=dict(), **keywords):
     # MEG
     default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian',N=204, K=8193,
                     data_params = dict(p = 0.001), # p = 0.001 = 8 active sources
-                    stop=dict(dgap_tol=1e-3, max_iter=1000000), scr_type = "GAP", switching='default',nbRuns=1, #50
-                    samp=20, min_reg=0.01, samp_type='log', algo_type = 'ISTA')# , wstart=True
+                    stop=dict(dgap_tol=1e-5, max_iter=1000000), scr_type = "GAP", switching='default',nbRuns=1, #50
+                    samp=5, min_reg=0.01, samp_type='log', algo_type = 'FISTA',switching_gamma=0.2)# , wstart=True)
     # Teste
 #    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
 #                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [5, 10, 15, 20], svd_decay = 'exponential' ),nbRuns=1,\
@@ -137,18 +137,19 @@ def complete(opt=dict(), **keywords):
     '''        
     np.random.seed(0)
     # SuKro - protocol
-#    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = ['ST1','GAP'],\
-#                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [[5], [10], [15], [20], [5, 10, 15, 20]], svd_decay = 'exponential', reuse = True),nbRuns=1,\
-#                    stop=[dict(dgap_tol=1e-4, max_iter=100000), dict(dgap_tol=1e-5, max_iter=100000), dict(dgap_tol=1e-6, max_iter=100000)], 
-#                    switching='default', switching_gamma=[0.2, 0.5, 0.8],
-#                    samp=20, min_reg=0.01, samp_type='log',  algo_type = ['FISTA','ISTA']) #, wstart=True)
-    # Choosing Gamma
-    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = ['GAP'],\
-                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [[5, 10, 15, 20]], svd_decay = 'exponential', reuse = True),nbRuns=1,\
-                    stop=[dict(dgap_tol=1e-4, max_iter=100000)], #, dict(dgap_tol=1e-5, max_iter=100000), dict(dgap_tol=1e-6, max_iter=100000)], 
-                    switching='default', switching_gamma=list(np.round(np.logspace(-2,np.log10(0.8),20),3)), #[0.5],
+    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = ['ST1','GAP'],\
+                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [[5], [10], [15], [20], [5, 10, 15, 20]], svd_decay = 'exponential', reuse = True),nbRuns=1,\
+                    stop=[dict(dgap_tol=1e-4, max_iter=100000), dict(dgap_tol=1e-5, max_iter=100000), dict(dgap_tol=1e-6, max_iter=100000)], 
+                    switching='default', switching_gamma=[0.2, 0.5, 0.8],
                     svd_decay_const_list = [0.1, 0.3, 0.5],
-                    samp=20, min_reg=0.01, samp_type='log',  algo_type = ['ISTA']) #, wstart=True)
+                    samp=20, min_reg=0.01, samp_type='log',  algo_type = ['FISTA','ISTA']) #, wstart=True)
+    # Choosing Gamma
+#    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = ['GAP'],\
+#                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [[5, 10, 15, 20]], svd_decay = 'exponential', reuse = True),nbRuns=1,\
+#                    stop=[dict(dgap_tol=1e-4, max_iter=100000)], #, dict(dgap_tol=1e-5, max_iter=100000), dict(dgap_tol=1e-6, max_iter=100000)], 
+#                    switching='default', switching_gamma=list(np.round(np.logspace(-2,np.log10(0.8),20),3)), #[0.5],
+#                    svd_decay_const_list = [0.1, 0.3, 0.5],
+#                    samp=20, min_reg=0.01, samp_type='log',  algo_type = ['ISTA']) #, wstart=True)
 
     expe = mergeopt(opt, default, keywords)
         
@@ -434,7 +435,61 @@ def gap_evolution_it_time_tol(opt =dict(), **keywords):
                 os.remove('./ResSynthData/'+make_file_name(opt)+'_lambda_'+str(opt['lasso'])+'.npz')
             # Plot results
             #traceGaps(res_dyn,res_dyn_approx,opt,RC)   
+
+def MEG_gap_evolution_it_time_tol(opt =dict(), **keywords):
+    '''
+    Same as gap_evolution_it_time, but used to generate the time colormap 
+    as a function of the convergence tolerande and the regularization.
     
+    Plot one execution of the dynamic screening for given options. Also plots
+    duality gap per iteration and as a function of time.
+     
+    to modify default option just do first(algo_type = 'FISTA')...
+    '''   
+    for seed in range(30):
+#        seed = 0
+        np.random.seed(seed)
+        
+        lasso_list = [0.2] #[0.5, 0.75, 0.85]
+        samp=20; min_reg=0.01; samp_type='log'
+        lasso_list = make_pen_param_list(samp,min_reg,samp_type)
+#        lasso_list = [0.1]
+        
+        for lasso in lasso_list:
+    
+            # MEG - FAuST
+#            default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian',N=204, K=8193, lasso=lasso,
+#                            data_params = dict(p = 0.001), # p = 0.001 = 8 active sources
+#                            stop=dict(dgap_tol=1e-5, max_iter=1000000), scr_type = "GAP", switching='default',
+#                            switching_gamma=0.3, algo_type = 'FISTA')# , wstart=True
+            # MEG - Low-rank
+            default =  dict(dict_type = 'MEG_low-rank', data_type = 'bernoulli-gaussian',N=204, K=8193, lasso=lasso,
+                            data_params = dict(p = 0.001), # p = 0.001 = 8 active sources
+                            dict_params = dict(ranks = [20, 40, 60, 80, 100] ), # [20, 40, 60, 80, 100, 120], other: [10, 20, 30, 40, 50, 60, 70, 80] [20, 40, 60, 80] 
+                            stop=dict(dgap_tol=1e-5, max_iter=1000000), scr_type = "GAP", switching='default',
+                            #L = 'fixed', #'backtracking'
+                            switching_gamma=0.3, algo_type = 'FISTA')# , wstart=True   
+                            
+            opt = mergeopt(default, opt, keywords)
+            default = default_expe()
+            opt = mergeopt(opt, default, keywords)
+            
+            filename = './ResSynthData/'+make_file_name(opt)+'_gamma'+str(opt['switching_gamma'])+'_lambda_'+str(opt['lasso'])+'_seed'+str(seed)+'.npz'
+            # Run only if necessary
+            if os.path.isfile(filename):
+                Data = np.load(filename)
+                res_dyn = Data['res_dyn'][()] 
+                res_dyn_approx = Data['res_dyn_approx'][()]
+                RC = Data['RC'].tolist()
+            else:
+                res_dyn, res_dyn_approx, no_screen, RC = expeScrRate(opt=opt)
+                del res_dyn['sol']; del res_dyn_approx['sol']; del no_screen['sol']
+                del res_dyn['problem']; del res_dyn_approx['problem']; del no_screen['problem']
+                np.savez('./ResSynthData/'+make_file_name(opt)+'_gamma'+str(opt['switching_gamma'])+'_lambda_'+str(opt['lasso'])+'_seed'+str(seed)+'.npz',\
+                         res_dyn=res_dyn,res_dyn_approx=res_dyn_approx,no_screen=no_screen,opt=opt,RC=RC)
+                os.remove('./ResSynthData/'+make_file_name(opt)+'_lambda_'+str(opt['lasso'])+'.npz')
+            # Plot results
+            #traceGaps(res_dyn,res_dyn_approx,opt,RC)       
 
 def approx_RC_compromise(opt=dict(), **keywords):
     '''
@@ -470,8 +525,8 @@ def approx_RC_compromise(opt=dict(), **keywords):
 #    matplotlib.rc('mathtext', fontset='cm')
     # Option 2
     matplotlib.rc('text', usetex=True)
-    matplotlib.rc('font',**{'family':'serif','serif':['Times']})
-#    matplotlib.rc('font',family='serif' ) #default with usetex=True is Computer Modern Roman
+#    matplotlib.rc('font',**{'family':'serif','serif':['Times']})
+    matplotlib.rc('font',family='serif' ) #default with usetex=True is Computer Modern Roman
     linestyles = ['-', '--', ':', '-.'] # for gammas
     
     f , (singVals, approxRC) = \
@@ -549,7 +604,7 @@ def approx_RC_compromise(opt=dict(), **keywords):
     
     approx_nkron.set_ylabel(r'mean $\epsilon_j$')
     approx_nkron.set_xlabel(r'$n_{\mathrm{kron}}$')    
-    approx_nkron.legend(['Harsh','Moderate','Mild'],fontsize=24,loc=3,frameon=False)
+    approx_nkron.legend(['Hard','Moderate','Easy'],fontsize=24,loc=3,frameon=False)# ['Harsh','Moderate','Mild']
 
     
     f.savefig('./ResSynthData/RC-approx_compromise_'+make_file_name(opt)+'.pdf',bbox_inches = 'tight',bbox_pad = 2 )
@@ -570,6 +625,8 @@ def estimateRC(D,opt,total_it=1000, verbose=False, experimental=True):
     
         screen = np.ones(opt['K'],dtype=np.int)
         D_dense = Dict(np.random.randn(opt['N'],opt['K']))
+#        meg_data = sio.loadmat('./datasets/MEG/X_meg.mat') # DEBUG TO DELETE
+#        D_dense = Dict(meg_data['X_fixed']) # unstructured MEG matrix # DEBUG TO DELETE
         for k in range(total_it):
             p = float(k+1)/total_it # testing over different sparsity levels
             
@@ -743,6 +800,9 @@ def expeScrRate(opt={},**keywords):
     norm2E_all = []
     RC = []
     if opt['dict_type'] is 'sukro_approx':    
+        opt['dict_params']['nkron_list'] = opt['dict_params']['n_kron'] 
+        opt['dict_params']['nkron_max'] = max(opt['dict_params']['nkron_list'])   
+
         # Verify if already done before
         nkron_list_str = '-'.join(str(e) for e in opt['dict_params']['n_kron']) #converts list into string using '-' as a separator
         filename =  './ResSynthData/RC_normE_decay'+str(opt['dict_params']['svd_decay_const'])+'_'+opt['dict_type']+'-dict_'+opt['data_type']+'-data_N'+str(opt['N'])+'_K'+str(opt['K'])+'_nkron'+nkron_list_str+'.npz'
@@ -767,7 +827,7 @@ def expeScrRate(opt={},**keywords):
                     problem.D_bis.nkron = nkron
                     RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=True,experimental=True))
                     
-#            np.savez(filename,normE_all=normE_all,norm2E_all=norm2E_all,RC=RC,total_it=1000,experimental=True)    
+            if 'reuse' in opt['dict_params']: np.savez(filename,normE_all=normE_all,norm2E_all=norm2E_all,RC=RC,total_it=1000,experimental=True)    
 
     elif opt['dict_type']=='MEG':
         meg_data = sio.loadmat('./datasets/MEG/X_meg.mat')
@@ -784,6 +844,15 @@ def expeScrRate(opt={},**keywords):
                      './datasets/MEG/faust_approx/M_6.mat']
 #        filenames = ['./datasets/MEG/faust_approx/M_16.mat'] # M6 seems to give best results
         alphas = [1e12, 1e11, 1e6, 1e7] # Scaling factors for FAuST (to avoid too discrepant values)
+
+        # Load empirical RC , if already done
+        RC_filename = './datasets/MEG/faust_approx/RC_M25_16_8_6.npz'
+        RC_loaded = False
+        if os.path.isfile(RC_filename):
+            Data = np.load(RC_filename)
+            RC = Data['RC'].tolist()
+            RC_loaded = True
+            print('Loaded RC: ['+', '.join(map(str, RC))+']')
         
         opt['dict_params'] = []
         for filename, alpha in zip(filenames,alphas):
@@ -813,9 +882,11 @@ def expeScrRate(opt={},**keywords):
             norm2E_all.append(np.linalg.norm(E,2))
             normE_all.append(np.linalg.norm(E,axis=0))
             
-            # Estimate RC
-#            RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=True,experimental=True))           
-            RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
+            # Estimate RC - if not already loaded
+            if not RC_loaded:
+                RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=True,experimental=True))           
+#                RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
+                np.savez(RC_filename,RC=RC,total_it=10000,experimental=True)
             
         del F,E
         
@@ -832,6 +903,70 @@ def expeScrRate(opt={},**keywords):
 #        del meg_data
         
         problem, opt = GP.generate(opt,D=D,D_bis=D_bis)
+
+    elif opt['dict_type']=='MEG_low-rank':
+        
+        meg_data = sio.loadmat('./datasets/MEG/X_meg.mat')
+        D = meg_data['X_fixed'] # unstructured MEG matrix
+        
+        ranks_list_str = '-'.join(str(e) for e in opt['dict_params']['ranks']) #converts list into string using '-' as a separator        
+        opt['K'] = D.shape[1]
+        opt['N'] = D.shape[0]
+        
+        D = Dict(D)
+        D_bis_list = []
+
+        # Calculating approximations - if not already done before
+        filename =  './ResSynthData/'+opt['dict_type']+'-dict_'+'_N'+str(opt['N'])+'_K'+str(opt['K'])+'_ranks'+ranks_list_str+'.npz'
+        if os.path.isfile(filename): # Load previously generate factors
+            Data = np.load(filename)
+            D_bis_list =  Data['D_bis_list'][()].tolist()
+        else:
+            # SVD calculation
+            L,S,R = np.linalg.svd(D.data, full_matrices=False)
+            for n_rank in opt['dict_params']['ranks']:
+                D_bis = np.dot(L[:,:n_rank]*S[:n_rank],R[:n_rank,:])
+                D_bis = Dict(D_bis,'low-rank',dict(L=L[:,:n_rank]*S[:n_rank], R=R[:n_rank,:]))
+#                normcoef = np.sqrt(np.sum(D_bis**2,0)); D_bis /= np.tile(normcoef,(D_bis.shape[0],1)) # Normalizing columns to unit-norm
+                D_bis_list.append(D_bis)
+                
+            np.savez(filename,D_bis_list=D_bis_list)
+            
+        # Calculating RC and Approximation error for different ranks - if not done before
+        filename =  './ResSynthData/RC_normE_'+opt['dict_type']+'-dict_'+opt['data_type']+'-data_N'+str(opt['N'])+'_K'+str(opt['K'])+'_ranks'+ranks_list_str+'.npz'
+        if os.path.isfile(filename): # Load previously generate factors
+            Data = np.load(filename)
+            RC = Data['RC'][()].tolist()
+            norm2E_all = Data['norm2E_all'][()]
+            normE_all = Data['normE_all'][()]
+            print('Loaded RC: ['+', '.join(map(str, RC))+']')
+        else:
+            for  rank_idx, n_rank in enumerate(opt['dict_params']['ranks']):
+                D_bis = D_bis_list[rank_idx]
+                # Calculate errors
+                E = D_bis.data - D.data
+                norm2E_all.append(np.linalg.norm(E,2))
+                normE_all.append(np.linalg.norm(E,axis=0))
+            
+                # Estimate RC
+                total_it = 10000; experimental = True
+                RC.append(estimateRC(D_bis,opt,total_it=total_it,verbose=True,experimental=experimental))
+                
+            np.savez(filename,normE_all=normE_all,norm2E_all=norm2E_all,RC=RC,total_it=total_it,experimental=experimental)                
+
+        opt['dict_params'] = D_bis_list
+        
+        # Load 'y' for benchmark with Matlab
+#        meg_data = sio.loadmat('./datasets/MEG/faust_approx/Data.mat')
+#        y = meg_data['Data'][:,0]
+#        y = np.expand_dims(y, -1)
+#        del meg_data
+        
+        problem, opt = GP.generate(opt,D=D,D_bis=D_bis_list[0])
+        
+        if opt['L'] is not 'backtracking':
+            opt['L'] = np.linalg.norm(D.data,2) ** 2 # fixed step size
+            print('Using fixed step-size!')
     else:
         raise NotImplementedError('\n Implemented only for SuKro dictionaries')
 
@@ -878,6 +1013,8 @@ def expeScrRate(opt={},**keywords):
             
     if 'ResSynthData' not in os.listdir('./'):
         os.mkdir('ResSynthData')
+    if opt['dict_type']=='MEG':
+        del opt['dict_params'] # cannot be saved "no default __reduce__ due to non-trivial __cinit__"
     np.savez('./ResSynthData/'+make_file_name(opt)+'_lambda_'+str(opt['lasso'])+'.npz',\
         scrRate=dynamicRun['screenrate'],radius=dynamicRun['radius'],\
         ObjValue=dynamicRun['objective'], opt=opt, RC=RC,\
@@ -1299,9 +1436,8 @@ def runAllversions(problem=None, RC=1, normE_all=[], norm2E_all=[], opt={}, warm
                                 scr_type=opt['scr_type'], \
                                 dict_specs = opt['dict_params']['n_kron'], \
                                 EmbedTest='dynamic', algo_type=opt['algo_type'], \
-                                warm_start = warm_start, switching_gamma = opt.get('switching_gamma',2e-1))
-                                
-    elif opt['dict_type']=='MEG':
+                                warm_start = warm_start, switching_gamma = opt.get('switching_gamma',2e-1))                                                              
+    elif (opt['dict_type']=='MEG') or (opt['dict_type']=='MEG_low-rank'):
         # At this point: D = slow (=fast+E), D_bis = fast
         problem.D, problem.D_bis = problem.D_bis, problem.D # start with the approximate (fast) dictionary 
         
@@ -1309,23 +1445,35 @@ def runAllversions(problem=None, RC=1, normE_all=[], norm2E_all=[], opt={}, warm
 #                                        scr_type=opt['scr_type'], \
 #                                        EmbedTest='dynamic', algo_type=opt['algo_type'], \
 #                                        warm_start = warm_start)
+        
+#        import cProfile
+#        pr = cProfile.Profile()
+#        pr.enable()
+ 
         # gives same result as before
         res_dyn_approx = \
             solver_multiple(problem=problem, normE_all=normE_all, norm2E_all = norm2E_all, RC=RC, L=opt['L'], stop=opt['stop'], switching=opt['switching'], \
                                 scr_type=opt['scr_type'], \
                                 dict_specs = opt['dict_params'], \
                                 EmbedTest='dynamic', algo_type=opt['algo_type'], \
-                                warm_start = warm_start)
+                                warm_start = warm_start, switching_gamma = opt.get('switching_gamma',2e-1))
+
+#        pr.disable()         
+#        pr.print_stats(sort='time')
 
     else:
         raise NotImplementedError('\n Not implemented for this type of dictionary')
 
+#    pr = cProfile.Profile()
+#    pr.enable()
 
     # Exact Screening - Dynamic
     res_dyn = solver(problem=problem, L=opt['L'], stop=opt['stop'],\
                             scr_type=opt['scr_type'], \
                             EmbedTest='dynamic', algo_type=opt['algo_type'], \
                             warm_start = warm_start) 
+#    pr.disable()         
+#    pr.print_stats(sort='time')
 
     # Exact Screening - Static                  
     res_static = solver(problem=problem, L=opt['L'], stop=opt['stop'],\
@@ -1449,6 +1597,16 @@ def runLambdas(opt={},**keywords):
 #        filenames = ['./datasets/MEG/faust_approx/M_16.mat'] # M6 seems to give best results
         alphas = [1e12, 1e11, 1e6, 1e7] # Scaling factors for FAuST (to avoid too discrepant values)
         
+        # Load empirical RC , if already done
+        RC_filename = './datasets/MEG/faust_approx/RC_M25_16_8_6.npz'
+        RC_loaded = False
+        if os.path.isfile(RC_filename):
+            Data = np.load(RC_filename)
+            RC = Data['RC'].tolist()
+            RC_loaded = True
+            print('Loaded RC: ['+', '.join(map(str, RC))+']')
+
+        
         opt['dict_params'] = []
         for filename, alpha in zip(filenames,alphas):
             # Fast approximation of dictionary
@@ -1477,9 +1635,11 @@ def runLambdas(opt={},**keywords):
             norm2E_all.append(np.linalg.norm(E,2))
             normE_all.append(np.linalg.norm(E,axis=0))
             
-            # Estimate RC
-#            RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=True,experimental=True))           
-            RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
+            # Estimate RC - if not already loaded
+            if not RC_loaded:
+                RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=True,experimental=True))           
+#                RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
+                np.savez(RC_filename,RC=RC,total_it=10000,experimental=True)
             
         del F,E
         
@@ -2159,7 +2319,7 @@ def runVersions(problem=None, RC=1, normE_all=[], norm2E_all=[], opt={}, warm_st
                                 scr_type=opt['scr_type'], \
                                 dict_specs = opt['dict_params'], \
                                 EmbedTest='dynamic', algo_type=opt['algo_type'], \
-                                warm_start = warm_start)
+                                warm_start = warm_start, switching_gamma = gamma)
 
     else:
         raise NotImplementedError('\n Not implemented for this type of dictionary')
