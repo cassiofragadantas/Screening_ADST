@@ -105,21 +105,6 @@ Parameter description
 
 The user can easily change the experiments parameters by modifying the key values of the dictionary 'default' in 'expe_journal.py' file.
 
-Example of experiment parameters:
-
-default = dict( dict_type = 'sukro_approx',
-                data_type = 'bernoulli-gaussian', 
-                N=2500,K=10000,
-                scr_type = ['ST1','GAP'],
-                dict_params = dict( N1 = 50, N2 = 50, K1 = 100, K2 = 100,
-                                    n_kron = [[5], [10], [15], [20], [5, 10, 15, 20]], 
-                                    svd_decay = 'exponential', reuse = True),
-                nbRuns=1,
-                stop=[dict(dgap_tol=1e-4, max_iter=100000), dict(dgap_tol=1e-5, max_iter=100000), dict(dgap_tol=1e-6, max_iter=100000)],
-                switching='default', switching_gamma=[0.2, 0.5, 0.8],
-                samp=20, min_reg=0.01, samp_type='log', 
-                algo_type = ['FISTA','ISTA']) #, wstart=True)
-
 Here is a brief description of each key:
                 
 - **dict_type**: type of dictionary used in the experiment. 'sukro_approx' corresponds to a dictionary which can be efficiently approximated by a SuKro matrix. Some possible choices: 'gnoise' (random gaussian) ,'pnoise', 'low-rank', 'sukro_approx'.
