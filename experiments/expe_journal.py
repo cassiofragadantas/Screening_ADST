@@ -61,18 +61,18 @@ def first(opt =dict(), **keywords):
     for lasso in lasso_list:
 
         # SuKro
-#        default = dict(dict_type = 'sukro_approx',data_type = 'gnoise', lasso=lasso, N=2500,K=10000,scr_type = "GAP",\
-#                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [5, 10, 15, 20], svd_decay = 'exponential' ),\
-#                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='default') #, wstart=True)
+        default = dict(dict_type = 'sukro_approx',data_type = 'gnoise', lasso=lasso, N=2500,K=10000,scr_type = "GAP",\
+                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [5, 10, 15, 20], svd_decay = 'exponential', reuse=True ),\
+                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='default') #, wstart=True)
         # MEG
 #        default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian',  lasso=lasso,N=204, K=8193,\
 #                        data_params = dict(p = 0.001),
 #                        stop=dict(dgap_tol=1e-4, max_iter=1000000), scr_type = "GAP", switching='default', algo_type = 'ISTA')
         # Test
-        default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', lasso=lasso, N=900,K=10000,scr_type = "GAP",\
-                    data_params = dict(p = 0.1),
-                    dict_params = dict(N1 = 30, N2 = 30, K1 = 100, K2 = 100,n_kron = [15], svd_decay = 'exponential' ),\
-                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='screening_only', algo_type = 'ISTA') #, wstart=True)
+#        default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', lasso=lasso, N=900,K=10000,scr_type = "GAP",\
+#                    data_params = dict(p = 0.1),
+#                    dict_params = dict(N1 = 30, N2 = 30, K1 = 100, K2 = 100,n_kron = [15], svd_decay = 'exponential' ),\
+#                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='screening_only', algo_type = 'ISTA') #, wstart=True)
                         
         expe = mergeopt(default, opt, keywords)
         expeScrRate(opt=expe)
@@ -93,15 +93,15 @@ def second(opt=dict(), **keywords):
 #                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='default',
 #                    samp=5, min_reg=0.01, samp_type='log') #, wstart=True)
     # MEG
-    default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian',N=204, K=8193,
-                    data_params = dict(p = 0.001), # p = 0.001 = 8 active sources
-                    stop=dict(dgap_tol=1e-5, max_iter=1000000), scr_type = "GAP", switching='default',nbRuns=1, #50
-                    samp=5, min_reg=0.01, samp_type='log', algo_type = 'FISTA',switching_gamma=0.2)# , wstart=True)
+#    default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian',N=204, K=8193,
+#                    data_params = dict(p = 0.001), # p = 0.001 = 8 active sources
+#                    stop=dict(dgap_tol=1e-5, max_iter=1000000), scr_type = "GAP", switching='default',nbRuns=1, #50
+#                    samp=5, min_reg=0.01, samp_type='log', algo_type = 'FISTA',switching_gamma=0.2)# , wstart=True)
     # Teste
-#    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
-#                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [5, 10, 15, 20], svd_decay = 'exponential' ),nbRuns=1,\
-#                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='default',
-#                    samp=5, min_reg=0.01, samp_type='log', wstart=True) #, wstart=True)
+    default = dict(dict_type = 'sukro_approx',data_type = 'bernoulli-gaussian', N=2500,K=10000,scr_type = "GAP",\
+                    dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100,n_kron = [5, 10, 15, 20], svd_decay = 'exponential' ),nbRuns=1,\
+                    stop=dict(dgap_tol=1e-6, max_iter=1000), switching='default',
+                    samp=5, min_reg=0.01, samp_type='log', wstart=True) #, wstart=True)
     
     expe = mergeopt(opt, default, keywords)
     res = runLambdas(opt=expe)
@@ -1183,7 +1183,7 @@ def traceLambdas(timeRes, nbIter, nbFlops, opt):
             Gstr =''
                         
     ## Time plot
-    if opt['dict_type']  in {'sukro','low-rank','MEG'}: 
+    if opt['dict_type']  in {'sukro','sukro_approx','low-rank','MEG'}: 
         f = plt.figure(figsize=1.05*plt.figaspect(0.6))
         # Dynamic
         plt.plot(pen_param_list,q2_d,'ks-' ,markevery= mkevry,markersize = markersize)  
@@ -1198,7 +1198,7 @@ def traceLambdas(timeRes, nbIter, nbFlops, opt):
 #                            color = 'none', hatch = '\\')
         # Dynamic approx multiple
         plt.plot(pen_param_list, q2_d1,'m^-',
-                 label = 'A-D'+Gstr+opt['scr_type']+r'$: \| \mathbf{e}_j \|\!=\!10^{-1}$', 
+                 label = 'A-D'+Gstr+opt['scr_type'], 
                  markevery= mkevry, markersize = markersize)  
         plt.fill_between(pen_param_list, q1_d1, q3_d1,alpha = 0.2,
                          facecolor = 'm')   
@@ -1801,7 +1801,6 @@ def runLambdas(opt={},**keywords):
                  
     print('Done') 
 
-    opt['dict_params'] = [] # this is necessary because np.savez is uncapable of saving this key (also there is an error in make_file_name)
     
     if 'ResSynthData' not in os.listdir('./'):
         os.mkdir('ResSynthData')
