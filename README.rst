@@ -12,13 +12,15 @@ This code corresponds to the following publications:
 
 [3] C. F. Dantas and R. Gribonval, "Stable safe screening and structured dictionaries for faster L1 regularization", in IEEE Transactions on Signal Processing (Apr 2019). hal.inria.fr/hal-01954261
 
+This code is made in Python2 and requires Numpy and Matplotlib packages.
+
 .. contents::
 
 ------------
 Installation
 ------------
 
-1.  Clone this repository:
+1.  Clone this repository (or download it as a .zip):
 
     $ git clone https://github.com/cassiofragadantas/Screening_ADST.git
 
@@ -28,13 +30,13 @@ Installation
     
 3. Run the desired experiment
 
-    $ python -m experiments [EXP_NUM]
+    $ python2 -m experiments [EXP_NUM]
     
     where [EXP_NUMBER] is to be replaced the number of the desired experiment (see section Experiments).
 
 This will generate the corresponding figures and place in the ResSynthData folder.
 
-.. [*] fast_mat_prod was originally compiled for a GNU/Linux 64-bit PC with an Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz.
+.. [*] fast_mat_prod was originally compiled for a GNU/Linux 64-bit PC with an Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz. So, if you you're using a similar configuration, it might work without recompiling. 
 
 -----------
 Experiments
@@ -97,7 +99,7 @@ See ./experiments/__main__.py to find out which function is called for each [EXP
 15. The results of this simulation were used to generate Fig. 9 in the paper.
 16. Experiments with MEG data [*]_. The results of this simulation were used to generate Fig. 10 in the paper.
     
-    .. [*] Fig. 10 is not directly reproductible since it requires to load the MEG data which is not given in the repository. Please contact the authors if you want to reproduce this experiment. You will need measurement matrix in the X_meg.mat file to be placed in './datasets/MEG/', as well as the FAuST approximate dictionaries in mat files. You will also need to install the FAuST python toolbox.
+    .. [*] Fig. 10 is not directly reproductible since it requires to load the MEG data which is not given in the repository. Please contact the authors if you want to reproduce this experiment. You will need the measurement matrix X_meg.mat to be placed in './datasets/MEG/', as well as the FAuST approximate dictionaries in mat files. You will also need to install the FAuST python toolbox (faust.inria.fr).
 
 
 Parameter description

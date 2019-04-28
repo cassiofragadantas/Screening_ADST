@@ -21,7 +21,10 @@ from .misc import testopt, default_expe, make_pen_param_list
 from dynascreen.dictionary import Dict
 
 # Real data experiments
-from mnist import MNIST
+try:
+    from mnist import MNIST
+except ImportError:
+    pass
 import scipy.io as sio
 
 
@@ -82,9 +85,9 @@ def first_sukro(opt =dict(), **keywords): #expe 6
     for lasso in lasso_list:
 
         # SuKro
-#        default =  dict(dict_type = 'sukro', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
-#                        dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100, n_kron = 20),
-#                        stop=dict(dgap_tol=5e-6, max_iter=1000), scr_type = "GAP", switching='default')
+        default =  dict(dict_type = 'sukro', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
+                        dict_params = dict(N1 = 50, N2 = 50, K1 = 100, K2 = 100, n_kron = 20),
+                        stop=dict(dgap_tol=5e-6, max_iter=1000), scr_type = "GAP", switching='default')
         # Low-rank
 #        default =  dict(dict_type = 'low-rank', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
 #                        dict_params = dict(n_rank = 200),
@@ -96,8 +99,8 @@ def first_sukro(opt =dict(), **keywords): #expe 6
         # MEG
 #        default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian', lasso=lasso,N=204, K=8193,\
 #                        stop=dict(dgap_rel_tol=1e-5, max_iter=10000), scr_type = "GAP", switching='default')
-        default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian', lasso=lasso,N=204, K=8193,\
-                        stop=dict(dgap_tol=1e-4, max_iter=10000), scr_type = "GAP", switching='default', algo_type = 'FISTA')
+#        default =  dict(dict_type = 'MEG', data_type = 'bernoulli-gaussian', lasso=lasso,N=204, K=8193,\
+#                        stop=dict(dgap_tol=1e-4, max_iter=10000), scr_type = "GAP", switching='default', algo_type = 'FISTA')
         # Test
 #        default =  dict(dict_type = 'gnoise', data_type = 'bernoulli-gaussian', lasso=lasso, N=2500, K=10000,\
 #                        stop=dict(dgap_tol=1e-5, max_iter=1000), scr_type = "ST1", switching='default')

@@ -22,11 +22,14 @@ from .misc import testopt, default_expe, make_pen_param_list
 
 from dynascreen.dictionary import Dict
 
-from FaustPy import Faust #For version faust-2.2rc10 or earlier. Use directly Faust
-#import pyfaust # For version faust-2.3rc2 or later. Also must use pyfaust.Faust
+try:
+    from FaustPy import Faust #For version faust-2.2rc10 or earlier. Use directly Faust
+    #import pyfaust # For version faust-2.3rc2 or later. Also must use pyfaust.Faust
+except ImportError:
+    pass
 
 # Real data experiments
-from mnist import MNIST
+#from mnist import MNIST
 import scipy.io as sio
 
 # For multicolored line in legend 
