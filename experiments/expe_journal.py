@@ -402,7 +402,8 @@ def gap_evolution_it_time_tol(opt =dict(), **keywords):
      
     to modify default option just do first(algo_type = 'FISTA')...
     '''   
-    for seed in range(5):
+    seeds = range(5)    
+    for seed in seeds:
 #        seed = 0
         np.random.seed(seed)
         
@@ -438,6 +439,8 @@ def gap_evolution_it_time_tol(opt =dict(), **keywords):
                 os.remove('./ResSynthData/'+make_file_name(opt)+'_lambda_'+str(opt['lasso'])+'.npz')
             # Plot results
             #traceGaps(res_dyn,res_dyn_approx,opt,RC)   
+        traceTimeTol(opt,lasso_list,seed)
+    traceTimeTol(opt,lasso_list,seeds)
 
 def MEG_gap_evolution_it_time_tol(opt =dict(), **keywords):
     '''
@@ -2499,3 +2502,238 @@ def traceProtocol(timeRes, nbIter, nbFlops, opt):
     f.savefig('./ResSynthData/'+make_file_name(opt)+'_Simu_relNoScreen.pdf',bbox_inches = 'tight' )
     if not opt['disp_fig']:
         plt.close()
+        
+
+def traceTimeTol(opt,lasso_list,seeds):
+    """
+    Plots the tolerance/time colormap (Fig. 9 in TSP paper)
+    Time colormap: regularization (xaxis) vs. convergence tolerance (yaxis)
+    """    
+
+    import matplotlib.backends.backend_pdf
+    # Plot properties
+    matplotlib.rc('axes', labelsize = 24)
+    matplotlib.rc('xtick', labelsize = 24)
+    matplotlib.rc('ytick', labelsize = 24)
+    matplotlib.rc('axes', titlesize = 24)
+    matplotlib.rc('lines', linewidth = 3)
+    
+    #matplotlib.rc('mathtext', fontset='cm')
+    matplotlib.rc('text', usetex=True)
+    matplotlib.rc('font',**{'family':'serif','serif':['Times']})
+    
+    path = './ResSynthData/'
+    path_save = 'tolerance_time_colormap' # path to save graphs
+    
+    if path_save not in os.listdir(path):
+        os.mkdir(path_save)
+    path_save = path + path_save + '/'
+    
+    
+#    seeds = [0,1,2,3,4]
+    if not isinstance(seeds,list): seeds = [seeds]
+    suffix = '_seed' # only 5 runs
+
+    
+    sharey = True
+    f1 , ax_time = plt.subplots(1,3,sharex=True,sharey=sharey, figsize=(11.5,3)) #(10,5) if not using colorbar
+    plt.subplots_adjust(wspace=0.4, hspace=0.05)
+    f2 , ax_time_rel = plt.subplots(1,3,sharex=True,sharey=sharey, figsize=(11.5,3))
+    plt.subplots_adjust(wspace=0.4, hspace=0.05)
+    f2bis , ax_time_rel2 = plt.subplots(1,2,sharex=True,sharey=sharey, figsize=(9,3.7)) # (7.3,3)
+    plt.subplots_adjust(wspace=0.25, hspace=0.05)
+    f3 , ax_time_rel3 = plt.subplots(1,3,sharex=True,sharey=sharey, figsize=(11.5,3))
+    plt.subplots_adjust(wspace=0.4, hspace=0.05)
+            
+
+    pen_param_list = lasso_list
+    tols_vec = np.logspace(-6,-3,40)
+    
+    time_approx = np.zeros((len(tols_vec),len(pen_param_list)))
+    time_dyn = np.zeros_like(time_approx)
+    time_ns = np.zeros_like(time_approx)
+    
+
+    # Build time matrices only if necessary
+    name = make_file_name(opt)+\
+                '_gamma'+str(opt['switching_gamma'])+'_lambda_'+str(pen_param_list[-1])
+#    name = opt['algo_type']+'_'+opt['dict_type']+'-dict_'+opt['data_type']+'-data_N'+str(opt['N'])+"_K"+\
+#                str(opt['K'])+'_'+str(opt['scr_type'])+"_decay"+str(opt['dict_params']['svd_decay_const'])+\
+#                '_regpath10'+\
+#                '_Stop-'+opt['stop'].keys()[0] + str(opt['stop'].values()[0]) + '_nbRuns' +str(nbRuns) +\
+#                '_gamma'+str(opt['switching_gamma'])+'_lambda_'+str(pen_param_list[-1])
+    filename = path_save + name+suffix+"".join(map(str, seeds))+'_time-matrices.npz'
+    
+    if os.path.isfile(filename):
+        Data = np.load(filename)
+        time_dyn = Data['time_dyn'][()] 
+        time_approx = Data['time_approx'][()]
+        time_ns = Data['time_ns'][()]
+        tols_vec = Data['tols_vec'][()]
+        pen_param_list = Data['pen_param_list'][()]
+        RC = Data['RC'].tolist()
+    else:
+        for k_lasso, lasso in enumerate(pen_param_list):
+            for seed in seeds:
+                  
+#                name = opt['algo_type']+'_'+opt['dict_type']+'-dict_'+opt['data_type']+'-data_N'+str(opt['N'])+"_K"+\
+#                            str(opt['K'])+'_'+str(opt['scr_type'])+"_decay"+str(opt['dict_params']['svd_decay_const'])+\
+#                            '_regpath10'+\
+#                            '_Stop-'+opt['stop'].keys()[0] + str(opt['stop'].values()[0]) + '_nbRuns' +str(nbRuns) +\
+#                            '_gamma'+str(opt['switching_gamma'])+'_lambda_'+str(lasso)
+                name = make_file_name(opt)+\
+                            '_gamma'+str(opt['switching_gamma'])+'_lambda_'+str(lasso)                            
+                            
+                Data = np.load(path+name+suffix+str(seed)+'.npz')
+                dyn = Data['res_dyn'][()] 
+                dyn_approx = Data['res_dyn_approx'][()]
+                no_screen = Data['no_screen'][()]
+                RC = Data['RC'].tolist()
+                
+                time_elapsed_approx = np.cumsum(dyn_approx['time_per_it'])
+                time_elapsed_dyn = np.cumsum(dyn['time_per_it'])
+                time_elapsed_ns = np.cumsum(no_screen['time_per_it'])
+                
+                # Finds iteration number where a threshold 'tol' is obtained
+                for k_tol, tol in enumerate(tols_vec):
+                    idx = np.argmax(dyn['dGaps'] < tol)
+                    time_dyn[k_tol,k_lasso] += time_elapsed_dyn[idx-1]
+                    idx = np.argmax(dyn_approx['dGaps'] < tol)
+                    time_approx[k_tol,k_lasso] += time_elapsed_approx[idx-1]
+                    idx = np.argmax(no_screen['dGaps'] < tol)
+                    time_ns[k_tol,k_lasso] += time_elapsed_ns[idx-1]
+
+        # divide times by number of seeds
+        time_dyn/=len(seeds); time_approx/=len(seeds); time_ns/=len(seeds)
+        
+        # save resulting time matrices
+        np.savez(path_save + name+suffix+"".join(map(str, seeds))+'_time-matrices.npz',\
+                 time_dyn=time_dyn,time_approx=time_approx,time_ns=time_ns,opt=opt,RC=RC,tols_vec=tols_vec,pen_param_list=pen_param_list)
+    
+    
+    shading = 'flat' #'gouraud' #'flat'
+    cmap =  'Greys' #'Greys' #'inferno'#'viridis'
+    
+    ## Absolute time plot 
+   
+    # see example pcolormesh: https://matplotlib.org/gallery/images_contours_and_fields/pcolormesh_levels.html
+    vmin = 0 #np.min([time_approx,time_dyn,time_ns])
+    vmax = np.max([time_approx,time_dyn,time_ns])
+    ax_time[0].pcolormesh(pen_param_list,tols_vec,time_approx,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True) # norm=matplotlib.colors.LogNorm(vmin=vmin+1e-2, vmax=vmax)
+    ax_time[0].set_xscale('log'); ax_time[0].set_yscale('log')
+    
+    ax_time[1].pcolormesh(pen_param_list,tols_vec,time_dyn,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time[1].set_xscale('log'); ax_time[1].set_yscale('log')
+    
+    im=ax_time[2].pcolormesh(pen_param_list,tols_vec,time_ns,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time[2].set_xscale('log'); ax_time[2].set_yscale('log')
+
+    # colorbar in a new axis
+    f1.subplots_adjust(right=0.8)
+    cbar_ax = f1.add_axes([0.85, 0.15, 0.02, 0.7]) # Location and size of the colorbar
+    cb=f1.colorbar(im,cax=cbar_ax) # ticks=[vmin,int(vmax)]
+    cb.ax.set_title(r'$(s)$')
+
+    # x label
+    ax_time[1].set_xlabel(r'$\lambda/\lambda_{\mathrm{max}}$',fontsize = 24)
+    # y label
+    ax_time[0].set_ylabel(r'Duality gap',fontsize = 24)
+    # title
+    ax_time[0].set_title(r'$T_{\tilde{\mathbf{A}}}$',fontsize = 24)
+    ax_time[1].set_title(r'$T_{\mathbf{A}}$',fontsize = 24)
+    ax_time[2].set_title(r'$T_{N}$',fontsize = 24)
+ 
+    ## Relative time plot (normalized w.r.t no_screen)
+
+    # see example pcolormesh: https://matplotlib.org/gallery/images_contours_and_fields/pcolormesh_levels.html
+    vmin = 0 #np.min([time_approx,time_dyn,time_ns])
+    vmax = 1.05 #np.max([time_approx,time_dyn,time_ns])
+    im=ax_time_rel[0].pcolormesh(pen_param_list,tols_vec,time_approx/time_ns,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time_rel[0].set_xscale('log'); ax_time_rel[0].set_yscale('log')
+    
+    ax_time_rel[1].pcolormesh(pen_param_list,tols_vec,time_dyn/time_ns,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time_rel[1].set_xscale('log'); ax_time_rel[1].set_yscale('log')
+    
+#                ax_time_rel[2].axis('off') # would be all ones
+    ax_time_rel[2].pcolormesh(pen_param_list,tols_vec,time_approx/time_dyn,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time_rel[2].set_xscale('log'); ax_time_rel[2].set_yscale('log')
+    ax_time_rel[2].set_title(r'$T_{\mathbf{A}}/T_{N}$',fontsize = 24)
+    
+    # colorbar in a new axis
+    f2.subplots_adjust(right=0.8)
+    cbar_ax = f2.add_axes([0.85, 0.15, 0.02, 0.7]) # Location and size of the colorbar
+    cb=f2.colorbar(im,cax=cbar_ax) # ticks=[vmin,int(vmax)]
+#                cb.ax.set_title(r'$\lambda/\lambda_{\mathrm{max}}$')
+    
+    # x label
+    ax_time_rel[1].set_xlabel(r'$\lambda/\lambda_{\mathrm{max}}$',fontsize = 24)
+    # y label
+    ax_time_rel[0].set_ylabel(r'Duality gap',fontsize = 24)
+    # title
+    ax_time_rel[0].set_title(r'$T_{\tilde{\mathbf{A}}}/T_{N}$',fontsize = 24)
+    ax_time_rel[1].set_title(r'$T_{\mathbf{A}}/T_{N}$',fontsize = 24)
+
+    ## Relative time plot (normalized w.r.t no_screen) - ONLY 2 PLOTS
+
+    # see example pcolormesh: https://matplotlib.org/gallery/images_contours_and_fields/pcolormesh_levels.html
+    vmin = 0 #np.min([time_approx,time_dyn,time_ns])
+    vmax = 1.05 #np.max([time_approx,time_dyn,time_ns])
+    im=ax_time_rel2[0].pcolormesh(pen_param_list,tols_vec,time_approx/time_ns,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time_rel2[0].set_xscale('log'); ax_time_rel2[0].set_yscale('log')
+    
+    ax_time_rel2[1].pcolormesh(pen_param_list,tols_vec,time_dyn/time_ns,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time_rel2[1].set_xscale('log'); ax_time_rel2[1].set_yscale('log')
+                   
+    # colorbar in a new axis
+    f2bis.subplots_adjust(right=0.8)
+    cbar_ax = f2bis.add_axes([0.85, 0.15, 0.02, 0.7]) # Location and size of the colorbar
+    cb=f2bis.colorbar(im,cax=cbar_ax) # ticks=[vmin,int(vmax)]
+#                cb.ax.set_title(r'$\lambda/\lambda_{\mathrm{max}}$')
+    
+    # x label
+    ax_time_rel2[0].set_xlabel(r'$\lambda/\lambda_{\mathrm{max}}$',fontsize = 24)
+    ax_time_rel2[1].set_xlabel(r'$\lambda/\lambda_{\mathrm{max}}$',fontsize = 24)
+    # y label
+    ax_time_rel2[0].set_ylabel(r'Duality gap',fontsize = 24)
+    # title
+    ax_time_rel2[0].set_title(r'$T_{\tilde{\mathbf{A}}}/T_{N}$',fontsize = 24)
+    ax_time_rel2[1].set_title(r'$T_{\mathbf{A}}/T_{N}$',fontsize = 24)
+
+    ## Relative time plot (normalized w.r.t dyn)
+
+    # see example pcolormesh: https://matplotlib.org/gallery/images_contours_and_fields/pcolormesh_levels.html
+    vmin = 0 #np.min([time_approx,time_dyn,time_ns])
+    vmax = 1.05 #np.max([time_approx,time_dyn,time_ns])
+    im=ax_time_rel3[0].pcolormesh(pen_param_list,tols_vec,time_approx/time_dyn,cmap=cmap,vmin=vmin, vmax=vmax,shading=shading,rasterized=True)
+    ax_time_rel3[0].set_xscale('log'); ax_time_rel3[0].set_yscale('log')
+    
+    ax_time_rel3[1].axis('off') # would be all ones
+    
+    ax_time_rel3[2].axis('off') # would be all ones
+    
+    # colorbar in a new axis
+    f3.subplots_adjust(right=0.8)
+    cbar_ax = f3.add_axes([0.85, 0.15, 0.02, 0.7]) # Location and size of the colorbar
+    cb=f3.colorbar(im,cax=cbar_ax) # ticks=[vmin,int(vmax)]
+#                cb.ax.set_title(r'$\lambda/\lambda_{\mathrm{max}}$')
+
+    # x label
+    ax_time_rel3[0].set_xlabel(r'$\lambda/\lambda_{\mathrm{max}}$',fontsize = 24)
+    # y label
+    ax_time_rel3[0].set_ylabel(r'Duality gap',fontsize = 24)
+    # title
+    ax_time_rel3[0].set_title(r'$T_{\tilde{\mathbf{A}}}/T_{\mathbf{A}}$',fontsize = 24)
+
+    # Save eps figure
+    #            f1.savefig(path_save + name+suffix+"".join(map(str, seeds))+'_timeColormap.eps',bbox_inches = 'tight' ) 
+    f2.savefig(path_save + name+suffix+"".join(map(str, seeds))+'_timeRelColormap.eps',bbox_inches = 'tight' ) 
+    f2bis.savefig(path_save + name+suffix+"".join(map(str, seeds))+'_timeRelColormap2.eps',bbox_inches = 'tight' ) 
+    #            f3.savefig(path_save + name+suffix+"".join(map(str, seeds))+'_timeRel3Colormap.eps',bbox_inches = 'tight' ) 
+    
+    # saving all figures in one pdf file: https://stackoverflow.com/questions/17788685/python-saving-multiple-figures-into-one-pdf-file
+    pdf = matplotlib.backends.backend_pdf.PdfPages(path_save + name+suffix+"".join(map(str, seeds))+'_timeColormapAll.pdf')
+    for fig in [f1, f2, f3, f2bis]: ## will open an empty extra figure :(
+        pdf.savefig( fig, bbox_inches = 'tight')
+    pdf.close()
+    plt.close('all')
+     
