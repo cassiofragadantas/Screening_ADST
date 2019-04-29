@@ -26,7 +26,7 @@ Installation
 
 2. Recompile the  'fast_mat_prod' cython function [*]_:
 
-    $ cd dynascreen/ ; rm fast_mat_prod.so ; ./compile.sh
+    $ cd dynascreen/ ; rm fast_mat_prod.so ; ./compile.sh; cd ../
     
 3. Run the desired experiment
 

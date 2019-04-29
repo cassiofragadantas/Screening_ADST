@@ -7,10 +7,14 @@ Created on Sun Feb 12 16:41:32 2017
 
 from distutils.core import setup, Extension
 from Cython.Distutils import build_ext
+import numpy
 
 setup(
    cmdclass={'build_ext': build_ext},
    ext_modules=[Extension("fast_mat_prod", ["fast_mat_prod.pyx"],
-                          libraries=["gslcblas"])]
+                          libraries=["gslcblas"],
+                          include_dirs=[numpy.get_include()]
+                          )
+               ]
 
 )
