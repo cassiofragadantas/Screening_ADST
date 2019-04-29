@@ -2,7 +2,7 @@
 Safe screening rules with approximate dictionaries
 ==================================================
 
-This code is originally based on the code from Antoine Bonnefoy concerning the publication "Dynamic Screening: accelerating First-order Algorithms for the Lasso and Group-Lasso." A. Bonnefoy et al., 2015.
+This is a **Python 2.7** code originally based on the code from Antoine Bonnefoy concerning the publication "Dynamic Screening: accelerating First-order Algorithms for the Lasso and Group-Lasso." A. Bonnefoy et al., 2015.
 
 This code corresponds to the following publications:
 
@@ -12,9 +12,18 @@ This code corresponds to the following publications:
 
 [3] C. F. Dantas and R. Gribonval, "Stable safe screening and structured dictionaries for faster L1 regularization", in IEEE Transactions on Signal Processing (Apr 2019). hal.inria.fr/hal-01954261
 
-This code is made in Python2 and requires Numpy and Matplotlib packages.
-
 .. contents::
+
+
+------------
+Requirements
+------------
+
+- Numpy: $ pip2 install numpy
+- Matplotlib: $ pip2 install matplotlib
+- scipy: pip2 install scipy
+- Cython: pip2 install Cython
+- cblas (C library): for instance, in Ubuntu  $ sudo apt-get install libopenblas-dev
 
 ------------
 Installation
@@ -23,20 +32,24 @@ Installation
 1.  Clone this repository (or download it as a .zip):
 
     $ git clone https://github.com/cassiofragadantas/Screening_ADST.git
-
-2. Recompile the  'fast_mat_prod' cython function [*]_:
-
-    $ cd dynascreen/ ; rm fast_mat_prod.so ; ./compile.sh; cd ../
     
-3. Run the desired experiment
+2. Run the desired experiment
 
     $ python2 -m experiments [EXP_NUM]
     
     where [EXP_NUMBER] is to be replaced the number of the desired experiment (see section Experiments).
 
 This will generate the corresponding figures and place in the ResSynthData folder.
+If it doesn't work, you probably need to:
+
+3. Recompile the  'fast_mat_prod' cython function [*]_:
+
+    $ cd dynascreen/ ; rm fast_mat_prod.so ; ./compile.sh; cd ../
 
 .. [*] fast_mat_prod was originally compiled for a GNU/Linux 64-bit PC with an Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz. So, if you you're using a similar configuration, it might work without recompiling. 
+
+If you have a error finding 'cblas.h', verify that you have properly installed a cblas library (see Requirements section). Then, you can also try to uncomment lines 13 and 14 in the file dynascreen/setup.py.
+If you use GNU Scientific Library (GSL) CBLAS, you need replace libraries=['blas'] by library=['gslcblas'] in the file dynascreen/setup.py.
 
 -----------
 Experiments
