@@ -21,9 +21,14 @@ Requirements
 
 - Numpy: $ pip2 install numpy
 - Matplotlib: $ pip2 install matplotlib
-- scipy: pip2 install scipy
-- Cython: pip2 install Cython
-- cblas (C library): for instance, in Ubuntu  $ sudo apt-get install libopenblas-dev
+- scipy: $ pip2 install scipy
+- Cython: $ pip2 install Cython
+- cblas (C library): for instance, in Ubuntu: $ sudo apt-get install libopenblas-dev
+
+
+Your python 2 executable should be python2. Otherwise, you can do:
+
+    $ alias python2="python2.7"
 
 ------------
 Installation
