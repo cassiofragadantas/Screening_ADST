@@ -37,7 +37,7 @@ Installation
 1.  Clone this repository (or download it as a .zip):
 
     $ git clone https://github.com/cassiofragadantas/Screening_ADST.git
-    
+
 2. Run the desired experiment
 
     $ python2 -m experiments [EXP_NUM]
@@ -53,7 +53,7 @@ If it doesn't work, you probably need to:
 
 .. [*] fast_mat_prod was originally compiled for a GNU/Linux 64-bit PC with an Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz. So, if you you're using a similar configuration, it might work without recompiling. 
 
-If you have a error finding 'cblas.h', verify that you have properly installed a cblas library (see Requirements section). Then, you can also try to uncomment lines 13 and 14 in the file dynascreen/setup.py.
+If you have a error finding 'cblas.h', verify that you have properly installed a cblas library (see Requirements section). Then, you can also try to uncomment lines 13-15 in the file dynascreen/setup.py. Finally, if cblas is still not found, you can resort to some tool like findblas (https://libraries.io/pypi/findblas) and replace, in fast_mat_prod.c, #include "cblas.h" by #include "findblas.h" .
 If you use GNU Scientific Library (GSL) CBLAS, you need replace libraries=['blas'] by library=['gslcblas'] in the file dynascreen/setup.py.
 
 -----------

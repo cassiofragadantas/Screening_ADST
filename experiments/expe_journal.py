@@ -578,7 +578,7 @@ def approx_RC_compromise(opt=dict(), **keywords):
                 
                     # Estimate RC
                     problem.D_bis.nkron = nkron
-                    RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=True,experimental=False))
+                    RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=False,experimental=False))
                     
             ## Saving data
             np.savez('./ResSynthData/'+filename+'.npz', nkron=opt['dict_params']['n_kron'],RC=RC,normE_all=normE_all) #,norm2E_all)
@@ -623,8 +623,7 @@ def estimateRC(D,opt,total_it=1000, verbose=False, experimental=True):
     """
     
     if experimental:
-        if verbose:    
-            print "Estimating RC with %d runs"%(total_it)
+        print "Estimating RC with %d runs"%(total_it)
         
         mean_time_dense_dot, mean_time_denseT_dot = 0,0
         mean_time_dense, mean_time_denseT, mean_time_struct, mean_time_structT = 0,0,0,0
@@ -654,38 +653,42 @@ def estimateRC(D,opt,total_it=1000, verbose=False, experimental=True):
             D_dense.Apply(x)
             toc = time.time()
             mean_time_dense_dot = mean_time_dense_dot + (toc-tic)/float(total_it)
-            tic = time.time()    
-            D_dense.ApplyTranspose(xT)
-            toc = time.time()
-            mean_time_denseT_dot = mean_time_denseT_dot + (toc-tic)/float(total_it)        
-            ### Dense dictionary ###        
-            tic = time.time()    
-            D_dense.ApplyScreen(x,screen) #D_dense.Apply(x)
-            toc = time.time()
-            mean_time_dense = mean_time_dense + (toc-tic)/float(total_it)
-            tic = time.time()    
-            D_dense.ApplyTransposeScreen(xT,screen) #D_dense.ApplyTranspose(xT)
-            toc = time.time()
-            mean_time_denseT = mean_time_denseT + (toc-tic)/float(total_it)        
+            if verbose:
+                tic = time.time()    
+                D_dense.ApplyTranspose(xT)
+                toc = time.time()
+                mean_time_denseT_dot = mean_time_denseT_dot + (toc-tic)/float(total_it)        
+                ### Dense dictionary ###        
+                tic = time.time()    
+                D_dense.ApplyScreen(x,screen) #D_dense.Apply(x)
+                toc = time.time()
+                mean_time_dense = mean_time_dense + (toc-tic)/float(total_it)
+                tic = time.time()    
+                D_dense.ApplyTransposeScreen(xT,screen) #D_dense.ApplyTranspose(xT)
+                toc = time.time()
+                mean_time_denseT = mean_time_denseT + (toc-tic)/float(total_it)        
             ### Fast Dictionary ###
             tic = time.time()    
             D.ApplyScreen(x,screen) #D.Apply(x)
             toc = time.time()
             mean_time_struct = mean_time_struct + (toc-tic)/float(total_it)
-            tic = time.time()    
-            D.ApplyTransposeScreen(xT,screen) #D.ApplyTranspose(xT)
-            toc = time.time()
-            mean_time_structT = mean_time_structT + (toc-tic)/float(total_it)            
+            if verbose:
+                tic = time.time()    
+                D.ApplyTransposeScreen(xT,screen) #D.ApplyTranspose(xT)
+                toc = time.time()
+                mean_time_structT = mean_time_structT + (toc-tic)/float(total_it)            
         RC_dot = mean_time_struct/mean_time_dense_dot # Comparing to multiplying with np.dot
-        RCT_dot = mean_time_structT/mean_time_denseT_dot
-        RC = mean_time_struct/mean_time_dense
-        RCT = mean_time_structT/mean_time_denseT
+        if verbose:
+            RCT_dot = mean_time_structT/mean_time_denseT_dot
+            RC = mean_time_struct/mean_time_dense
+            RCT = mean_time_structT/mean_time_denseT
         
         if verbose:
             print "RC_dot = %1.3f"%(RC_dot)
             print "RCT_dot = %1.3f"%(RCT_dot)
             print "RC = %1.3f"%(RC)
             print "RCT = %1.3f"%(RCT)
+        print "Measured RC = %1.3f"%(RC_dot)
             
         RC = RC_dot
     else: #only theoretical RC
@@ -713,8 +716,7 @@ def estimateRC_faust(D,opt,total_it=1000, verbose=False, experimental=True,dense
     """
     
     if experimental:
-        if verbose:    
-            print "Estimating RC with %d runs"%(total_it)
+        print "Estimating RC with %d runs"%(total_it)
         
         mean_time_dense_dot, mean_time_denseT_dot = 0,0
         mean_time_dense, mean_time_denseT, mean_time_struct, mean_time_structT = 0,0,0,0
@@ -745,38 +747,42 @@ def estimateRC_faust(D,opt,total_it=1000, verbose=False, experimental=True,dense
             D_dense.Apply(x)
             toc = time.time()
             mean_time_dense_dot = mean_time_dense_dot + (toc-tic)/float(total_it)
-            tic = time.time()    
-            D_dense.ApplyTranspose(xT)
-            toc = time.time()
-            mean_time_denseT_dot = mean_time_denseT_dot + (toc-tic)/float(total_it)        
-            ### Dense dictionary ###        
-            tic = time.time()    
-            D_dense.ApplyScreen(x,screen) #D_dense.Apply(x)
-            toc = time.time()
-            mean_time_dense = mean_time_dense + (toc-tic)/float(total_it)
-            tic = time.time()    
-            D_dense.ApplyTransposeScreen(xT,screen) #D_dense.ApplyTranspose(xT)
-            toc = time.time()
-            mean_time_denseT = mean_time_denseT + (toc-tic)/float(total_it)        
+            if verbose:
+                tic = time.time()    
+                D_dense.ApplyTranspose(xT)
+                toc = time.time()
+                mean_time_denseT_dot = mean_time_denseT_dot + (toc-tic)/float(total_it)        
+                ### Dense dictionary ###        
+                tic = time.time()    
+                D_dense.ApplyScreen(x,screen) #D_dense.Apply(x)
+                toc = time.time()
+                mean_time_dense = mean_time_dense + (toc-tic)/float(total_it)
+                tic = time.time()    
+                D_dense.ApplyTransposeScreen(xT,screen) #D_dense.ApplyTranspose(xT)
+                toc = time.time()
+                mean_time_denseT = mean_time_denseT + (toc-tic)/float(total_it)        
             ### Fast Dictionary ###
             tic = time.time()    
             D*x
             toc = time.time()
             mean_time_struct = mean_time_struct + (toc-tic)/float(total_it)
-            tic = time.time()    
-            D.transpose()*xT
-            toc = time.time()
-            mean_time_structT = mean_time_structT + (toc-tic)/float(total_it)            
+            if verbose:            
+                tic = time.time()    
+                D.transpose()*xT
+                toc = time.time()
+                mean_time_structT = mean_time_structT + (toc-tic)/float(total_it)            
         RC_dot = mean_time_struct/mean_time_dense_dot # Comparing to multiplying with np.dot
-        RCT_dot = mean_time_structT/mean_time_denseT_dot
-        RC = mean_time_struct/mean_time_dense
-        RCT = mean_time_structT/mean_time_denseT
+        if verbose:
+            RCT_dot = mean_time_structT/mean_time_denseT_dot
+            RC = mean_time_struct/mean_time_dense
+            RCT = mean_time_structT/mean_time_denseT
         
         if verbose:
             print "RC_dot = %1.3f"%(RC_dot)
             print "RCT_dot = %1.3f"%(RCT_dot)
             print "RC = %1.3f"%(RC)
             print "RCT = %1.3f"%(RCT)
+        print "Measured RC = %1.3f"%(RC_dot)
             
         RC = RC_dot
     else: #only theoretical RC
@@ -831,7 +837,7 @@ def expeScrRate(opt={},**keywords):
                 
                     # Estimate RC
                     problem.D_bis.nkron = nkron
-                    RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=True,experimental=True))
+                    RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=False,experimental=True))
                     
             if 'reuse' in opt['dict_params']: np.savez(filename,normE_all=normE_all,norm2E_all=norm2E_all,RC=RC,total_it=1000,experimental=True)    
 
@@ -890,7 +896,7 @@ def expeScrRate(opt={},**keywords):
             
             # Estimate RC - if not already loaded
             if not RC_loaded:
-                RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=True,experimental=True))           
+                RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=False,experimental=True))           
 #                RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
                 np.savez(RC_filename,RC=RC,total_it=10000,experimental=True)
             
@@ -956,7 +962,7 @@ def expeScrRate(opt={},**keywords):
             
                 # Estimate RC
                 total_it = 10000; experimental = True
-                RC.append(estimateRC(D_bis,opt,total_it=total_it,verbose=True,experimental=experimental))
+                RC.append(estimateRC(D_bis,opt,total_it=total_it,verbose=False,experimental=experimental))
                 
             np.savez(filename,normE_all=normE_all,norm2E_all=norm2E_all,RC=RC,total_it=total_it,experimental=experimental)                
 
@@ -1586,7 +1592,7 @@ def runLambdas(opt={},**keywords):
             
                 # Estimate RC
                 problem.D_bis.nkron = nkron
-                RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=True,experimental=False))
+                RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=False,experimental=False))
     elif opt['dict_type']=='MEG':
         meg_data = sio.loadmat('./datasets/MEG/X_meg.mat')
         D = meg_data['X_fixed'] # unstructured MEG matrix
@@ -1643,7 +1649,7 @@ def runLambdas(opt={},**keywords):
             
             # Estimate RC - if not already loaded
             if not RC_loaded:
-                RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=True,experimental=True))           
+                RC.append(estimateRC_faust(F.transpose(),opt,total_it=10000,verbose=False,experimental=True))           
 #                RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
                 np.savez(RC_filename,RC=RC,total_it=10000,experimental=True)
             
@@ -1919,7 +1925,7 @@ def runLambdas_per_it(opt={},**keywords): #TODO merge with runLambdas
     if opt['dict_type'] in {'sukro','low-rank'}:
 #    if False:
         total_it = 1
-        RC = estimateRC(problem.D,opt,total_it,verbose=True)
+        RC = estimateRC(problem.D,opt,total_it,verbose=False)
     else: # otherwise we just assume RC = 0.5
         RC = 0.5
     print "RC = %1.2f"%(RC)    
@@ -2091,7 +2097,7 @@ def runProtocol(opt={},**keywords):
                 
                     # Estimate RC
                     problem.D_bis.nkron = nkron
-                    RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=True,experimental=True))
+                    RC.append(estimateRC(problem.D_bis,opt,total_it=1000,verbose=False,experimental=True))
                     
             np.savez(filename,normE_all=normE_all,norm2E_all=norm2E_all,RC=RC,total_it=1000,experimental=True)
 
@@ -2163,7 +2169,7 @@ def runProtocol(opt={},**keywords):
             normE_all.append(np.linalg.norm(E,axis=0))
             
             # Estimate RC
-            RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=True,experimental=False))
+            RC.append(estimateRC(D_bis,opt,total_it=10000,verbose=False,experimental=False))
             
         del F,E
        
