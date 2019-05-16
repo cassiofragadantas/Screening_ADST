@@ -2,7 +2,11 @@
 """
 Created on Tue Feb 28 11:51:44 2017
 
-@author: cfragada
+@author: cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 import numpy as np
 import matplotlib

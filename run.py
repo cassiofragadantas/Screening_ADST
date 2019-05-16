@@ -6,7 +6,9 @@ To usando uma função dele pra chamar do jeito que chama na linha de comando.
 
 https://docs.python.org/2/library/runpy.html
 
+Copyright (C) 2019 Cassio Fraga Dantas
 
+SPDX-License-Identifier: AGPL-3.0-or-later
 
 """
 

@@ -2,7 +2,11 @@
 """
 Created on Tue Oct 28 18:01:35 2014
 
-@author: antoinebonnefoy
+@author: antoinebonnefoy, cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 
 import numpy as np

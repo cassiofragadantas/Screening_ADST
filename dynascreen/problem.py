@@ -5,6 +5,10 @@ This module defines the Prbolem class so that our solver can solve either Lasso 
 Created on Wed Oct 29 17:33:11 2014
 
 @author: antoinebonnefoy
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 
 

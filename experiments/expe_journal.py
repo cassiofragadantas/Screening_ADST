@@ -3,6 +3,10 @@
 Created on Thu Oct 30 17:04:01 2014
 
 @author: cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 import numpy as np
 import os

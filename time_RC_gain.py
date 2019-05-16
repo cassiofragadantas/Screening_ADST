@@ -2,7 +2,11 @@
 """
 Created on Thu Jun 15 11:45:22 2017
 
-@author: cfragada
+@author: cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 import time
 import numpy as np

@@ -7,7 +7,11 @@ Alow to choose between dynamic screening,  static screening and no screening ver
 
 Created on Wed Oct 2 10:22:35 2013
 
-@author: Antoine Bonnefoy
+@author: Antoine Bonnefoy, cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 
 import numpy as np

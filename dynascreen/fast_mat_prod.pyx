@@ -3,6 +3,10 @@
 Created on Tue May 14 16:55:41 2013
 
 @author: antoinebonnefoy
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 import cython
 import numpy as np

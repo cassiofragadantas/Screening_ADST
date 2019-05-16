@@ -2,7 +2,11 @@
 """
 Created on Mon May 13 16:23:04 2013
 
-@author: antoinebonnefoy
+@author: antoinebonnefoy, cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 import numpy as np
 from numpy import linalg as la

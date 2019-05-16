@@ -5,7 +5,11 @@ It is usefull for allowing fast indexed matrix-vector product.
 
 Created on Mon Mar 18 16:29:46 2014
 
-@author: antoine Bonnefoy
+@author: antoine Bonnefoy, cassiofraga
+
+Copyright (C) 2019 Cassio Fraga Dantas
+
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 import numpy as np  
 import fast_mat_prod as fprod
